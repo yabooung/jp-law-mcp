@@ -1,0 +1,7 @@
+node_modules
+build
+eval
+test
+docs
+scripts
+*.log

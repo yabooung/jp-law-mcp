@@ -1,0 +1,14 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "buildCommand": "npm run build",
+  "fluid": true,
+  "outputDirectory": "public",
+  "regions": ["hnd1"],
+  "functions": {
+    "api/mcp.js": {
+      "maxDuration": 60,
+      "includeFiles": "{build/**,data/graph.json.gz,data/law_names.json.gz,data/structure.json.gz}"
+    }
+  },
+  "rewrites": [{ "source": "/mcp", "destination": "/api/mcp" }]
+}
