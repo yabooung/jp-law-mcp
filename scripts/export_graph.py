@@ -12,7 +12,7 @@
     l     : [引用元 arts 番号, 引用先 laws 番号, 0/1, 回数]
 
 使い方:
-    python scripts/export_graph.py --db <jp_search.sqlite> --out data/graph.json.gz
+    python scripts/export_graph.py --db <jp_search.sqlite> --jlawcite 2.5.0 --out data/graph.json.gz
 """
 from __future__ import annotations
 
@@ -42,6 +42,7 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--db", type=Path, required=True)
     ap.add_argument("--out", type=Path, default=Path("data/graph.json.gz"))
+    ap.add_argument("--jlawcite", required=True, help="検索DBを作った jlawcite の版（例 2.5.0）")
     ap.add_argument("--snapshot", default="2026-09-27", help="e-Gov スナップショット日（jlawcite release_stats.json の egov_snapshot）")
     a = ap.parse_args()
 
@@ -77,9 +78,10 @@ def main() -> int:
     ai = {x: i for i, x in enumerate(arts)}
     blob = {
         "meta": {
-            "source": "e-Gov 法令検索（デジタル庁）を JLaw-CiteGraph（jlawcite）で加工",
+            "source": f"e-Gov 法令検索（デジタル庁）を JLaw-CiteGraph（jlawcite {a.jlawcite}）で加工",
             "license": "CC BY 4.0（データ）",
             "egov_snapshot": a.snapshot,
+            "jlawcite": a.jlawcite,
             "generated": dt.date.today().isoformat(),
             "scope": "本則の条から出る引用・委任。附則からの参照は含まない",
             "counts": {"laws": len(laws), "articles": len(arts), "article_edges": len(pairs), "law_edges": len(to_law)},
