@@ -9,7 +9,7 @@
   "functions": {
     "api/mcp.js": {
       "maxDuration": 60,
-      "includeFiles": "{build/**,data/graph.json.gz,data/law_names.json.gz,data/structure.json.gz}"
+      "includeFiles": "{build/**,data/graph.json.gz,data/law_names.json.gz,data/structure.json.gz,data/tsutatsu.json.gz}"
     },
     "api/egov.js": {
       "maxDuration": 60,

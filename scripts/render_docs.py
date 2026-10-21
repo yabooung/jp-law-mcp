@@ -64,6 +64,11 @@ def values(root: Path = ROOT) -> dict[str, str]:
               f"{split}.flagged_kn": _kn(b["flagged"]),
               f"{split}.C_info": f"{c['by_mark'].get('ℹ', 0) / c['citations'] * 100:.1f}%",
               f"{split}.date": r["date"], f"{split}.cases": _n(r["cases"])}
+    # 基本通達の番号確認（eval/notice_eval.mjs）
+    nt = json.loads((root / "eval/results/notice.json").read_text(encoding="utf-8"))
+    v |= {"notice.fetched": nt["fetched"], "notice.checked": _n(nt["checked_unique"]), "notice.found": _n(nt["found"]),
+          "notice.rate": "100%" if nt["found"] == nt["checked_unique"] else f"{nt['found_rate'] * 100:.1f}%",
+          "notice.injected": _n(nt["injected"])}
     # get_article が添える施行令・施行規則の一覧（eval/subordinate_eval.mjs）
     sub = json.loads((root / "eval/results/subordinate.json").read_text(encoding="utf-8"))
     v |= {"sub.n": _n(sub["sub_articles"]), "sub.listed": _n(sub["listed"]), "sub.rate": f"{sub['rate'] * 100:.1f}%"}

@@ -5,6 +5,7 @@ import { CitationGraph, defaultGraph } from "./sources/graph.js";
 import { KokkaiClient } from "./sources/kokkai.js";
 import { LawNames, defaultNames } from "./sources/names.js";
 import { LawStructure, defaultStructure } from "./sources/structure.js";
+import { NoticeIndex, defaultNotices } from "./sources/tsutatsu.js";
 import { registerPrompts } from "./prompts.js";
 import { registerDietTools } from "./tools/diet.js";
 import { registerGraphTools } from "./tools/graph.js";
@@ -19,6 +20,7 @@ export interface ServerDeps {
   graph?: () => CitationGraph;
   names?: () => LawNames;
   structure?: () => LawStructure;
+  notices?: () => NoticeIndex | undefined;
   today?: () => string;
 }
 
@@ -42,7 +44,7 @@ export function createServer(deps: ServerDeps = {}): McpServer {
   const names = deps.names ?? defaultNames;
   registerLawTools(server, egov, deps.today, names, deps.graph ?? defaultGraph);
   registerSearchTools(server, egov);
-  registerVerifyTools(server, egov, names, deps.structure ?? defaultStructure);
+  registerVerifyTools(server, egov, names, deps.structure ?? defaultStructure, deps.notices ?? defaultNotices);
   registerGraphTools(server, deps.graph ?? defaultGraph, egov, names);
   registerDietTools(server, deps.kokkai ?? new KokkaiClient());
   registerPrompts(server);

@@ -13,6 +13,7 @@
     "data/graph.json.gz",
     "data/law_names.json.gz",
     "data/structure.json.gz",
+    "data/tsutatsu.json.gz",
     "data/SOURCE.json",
     "DATA_LICENSE.md"
   ],

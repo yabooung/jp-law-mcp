@@ -61,3 +61,19 @@ describe("tax abbreviations in the bundled dictionary", () => {
     expect(extractCitations("関係法令第3条", names)[0].lawId).toBeUndefined(); // 「法令」を法人税法施行令と読まない
   });
 });
+
+describe("basic NTA notices", () => {
+  it("checks a notice number against the index, leaving other notices unchecked", async () => {
+    const { NoticeIndex } = await import("../src/sources/tsutatsu.js");
+    const { checkNotices } = await import("../src/tools/verify.js");
+    const idx = new NoticeIndex({
+      meta: { source: "test", fetched: "2026-10-22" },
+      notices: { 所得税基本通達: { url: "https://www.nta.go.jp/law/tsutatsu/kihon/shotoku/01.htm", items: { "33-1の2": "(少額重要資産の範囲)", "181~223共-6": "" } } },
+    });
+    const found = otherCitations("所基通33-1の2、所得税基本通達33−99、所得税基本通達181〜223共-6、措置法通達31の4-1".normalize("NFKC"));
+    const r = checkNotices(found, idx);
+    expect([r.ok, r.missing]).toEqual([2, 1]);
+    expect(r.lines.find((l) => l.startsWith("❌"))).toContain("所得税基本通達に 33-99 は見つかりません");
+    expect(r.rest.map((o) => o.raw)).toEqual(["措置法通達31の4-1"]);
+  });
+});

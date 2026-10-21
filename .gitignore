@@ -5,3 +5,4 @@ eval/.cache/
 .vercel
 .env*
 work/
+__pycache__/

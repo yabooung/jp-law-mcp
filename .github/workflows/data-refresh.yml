@@ -66,6 +66,8 @@ jobs:
         run: node eval/verify_eval.mjs --gold work/nta_gold.jsonl --split test --unseal
       - name: 施行令・施行規則の一覧の評価
         run: node eval/subordinate_eval.mjs --gold work/nta_gold.jsonl
+      - name: 基本通達の番号確認の評価（一覧は手で時々作り直す。ここでは数え直すだけ）
+        run: node eval/notice_eval.mjs --gold work/nta_gold.jsonl
       - name: 文書の数値
         run: |
           python scripts/render_docs.py

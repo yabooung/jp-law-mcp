@@ -15,6 +15,10 @@
 法令そのものは著作権法第13条により権利の目的となりません。`src/`・`api/`・`scripts/`・`eval/*.mjs`・`test/` のコードは
 Apache-2.0（`LICENSE`）です。
 
+## 通達の番号（`data/tsutatsu.json.gz`）
+国税庁の基本通達（所得税・法人税・消費税法・相続税法・財産評価）の番号と見出しの一覧です。
+> 出典：国税庁ホームページ「法令解釈通達」（https://www.nta.go.jp/law/tsutatsu/menu.htm）を加工して作成
+
 ## 評価に使った資料
 `eval/results/` は、国税庁「質疑応答事例」を JLaw-CiteGraph が加工した `eval/v2/nta_gold.jsonl` で測った集計です。
 > 出典：国税庁ホームページ「質疑応答事例」（https://www.nta.go.jp/law/shitsugi/）を加工して作成

@@ -3,7 +3,8 @@ import { z } from "zod";
 
 import { articleLabel } from "../lib/article.js";
 import { extractCitations, type Citation } from "../lib/citations.js";
-import { otherCitations } from "../lib/others.js";
+import { otherCitations, type OtherCitation } from "../lib/others.js";
+import { normalizeNoticeNumber, type NoticeIndex } from "../sources/tsutatsu.js";
 import { ASOF_MIN, EGOV_SOURCE, EgovClient, EgovError, LAW_ID_RE, egovLawUrl, type LawDataResponse } from "../sources/egov.js";
 import type { LawNames } from "../sources/names.js";
 import type { LawStructure } from "../sources/structure.js";
@@ -258,7 +259,31 @@ export async function verifyText(
   return { total: all.length, apiCalls, checked: cites.map((citation, i) => ({ citation, verdict: verdicts[i]! })) };
 }
 
-export function registerVerifyTools(server: McpServer, client: EgovClient, names: () => LawNames, structure: () => LawStructure): void {
+/** 基本通達の番号の実在（data/tsutatsu.json.gz）。確かめられないもの（通達名・番号が分からない、判例・条例など）は rest に */
+export function checkNotices(others: OtherCitation[], idx: NoticeIndex | undefined): { lines: string[]; ok: number; missing: number; rest: OtherCitation[] } {
+  const lines: string[] = [];
+  const rest: OtherCitation[] = [];
+  let ok = 0;
+  let missing = 0;
+  for (const o of others) {
+    const key = o.kind === "通達" && o.name && o.number ? idx?.resolve(o.name) : undefined;
+    if (!key || !idx) { rest.push(o); continue; }
+    const num = normalizeNoticeNumber(o.number!);
+    const title = idx.item(key, num);
+    if (title !== undefined) {
+      ok++;
+      lines.push(`✅ ${o.raw}（通達）→ ${key} ${num}${title ? ` ${title}` : ""}`);
+    } else {
+      missing++;
+      lines.push(`❌ ${o.raw}（通達）→ ${key}に ${num} は見つかりません（国税庁ホームページ ${idx.fetched} 時点）。番号を確かめてください\n   目次: ${idx.url(key)}`);
+    }
+  }
+  return { lines, ok, missing, rest };
+}
+
+export function registerVerifyTools(
+  server: McpServer, client: EgovClient, names: () => LawNames, structure: () => LawStructure, notices?: () => NoticeIndex | undefined,
+): void {
   server.registerTool(
     "verify_citations",
     {
@@ -283,7 +308,13 @@ export function registerVerifyTools(server: McpServer, client: EgovClient, names
       const res = await verifyText(text, { client, names: names(), structure: st, asof, defaultLaw: default_law, excerpt: detail ? EXCERPT_DETAIL : EXCERPT });
       // 通達・判例・条例・告示は確かめない。黙って飛ばさず、確かめていないことを示す
       const named = new Set(res.checked.map((x) => x.citation.lawName).filter(Boolean));
-      const others = otherCitations(text.normalize("NFKC")).filter((o) => !named.has(o.raw));
+      const found = otherCitations(text.normalize("NFKC")).filter((o) => !named.has(o.raw));
+      // 基本通達の番号は確かめる。残りは「確かめていない引用」として示す
+      const nc = checkNotices(found, notices?.());
+      const others = nc.rest;
+      const noticeText = nc.lines.length
+        ? ["", `通達 ${nc.lines.length} 件を確認（国税庁の基本通達の番号）: 実在 ${nc.ok}・見つからない ${nc.missing}`, ...nc.lines]
+        : [];
       const othersText = others.length
         ? ["", `確かめていない引用（法令ではないもの）${others.length} 件: ` +
           (["通達", "判例", "条例", "告示"] as const).map((k) => {
@@ -292,7 +323,7 @@ export function registerVerifyTools(server: McpServer, client: EgovClient, names
           }).filter(Boolean).join("・") + "。このツールでは実在を確かめていません。原文で確認してください。"]
         : [];
       if (res.checked.length === 0) {
-        return { content: [{ type: "text" as const, text: ["法令の条の引用（「第N条」）は見つかりませんでした。", ...othersText].join("\n") }] };
+        return { content: [{ type: "text" as const, text: ["法令の条の引用（「第N条」）は見つかりませんでした。", ...noticeText, ...othersText].join("\n") }] };
       }
       const verdicts = res.checked.map((x) => x.verdict);
       const count = (m: Verdict["mark"]) => verdicts.filter((v) => v.mark === m).length;
@@ -304,7 +335,7 @@ export function registerVerifyTools(server: McpServer, client: EgovClient, names
         content: [{
           type: "text" as const,
           text: [
-            head, "", ...body, ...othersText, "",
+            head, "", ...body, ...noticeText, ...othersText, "",
             `確認したのは法令・条・項・号の実在だけです。引用した主張が条文に合っているかは、抜粋と原文で確かめてください。` +
             `条・項・号の有無は e-Gov のスナップショット（${st.snapshot}）で調べ、そのうち最大 ${MAX_API_CALLS} 件を現行版で確かめて抜粋を付けています。出典: ${EGOV_SOURCE}`,
           ].join("\n"),
