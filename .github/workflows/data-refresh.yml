@@ -77,3 +77,17 @@ jobs:
           git push origin HEAD:main
       - name: 接続先が新しいデータで動いているか
         run: node scripts/smoke_remote.mjs --wait 900
+
+  health:
+    # データが変わらない日も、接続先が動いていて e-Gov が答えるか（送り元が制限されていないか）を 1 回だけ確かめる
+    needs: check
+    if: needs.check.outputs.changed != 'true' && inputs.force != true
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: npm ci
+      - run: node scripts/smoke_remote.mjs

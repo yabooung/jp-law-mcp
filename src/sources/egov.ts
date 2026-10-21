@@ -9,6 +9,8 @@
  *   - 同じ問い合わせは 10 分キャッシュ
  *   - エラーページへの転送・429・503・HTML の応答は「制限中」とし、blockedMs（既定 10 分）は送らずにすぐ断る
  *   上限を上げる変更は CONTRIBUTING.md「外部 API の使い方」に従う
+ * - proxy を指定すると e-Gov ではなく中継（src/egov-proxy.ts）に問い合わせる。中継の応答は CDN がまとめて返すので、
+ *   遠隔コネクタの利用者が増えても e-Gov に届く件数は問い合わせの種類の数にとどまる。上の送り方の制限は中継側でも同じ
  */
 
 import { USER_AGENT } from "../version.js";
@@ -76,6 +78,8 @@ export class EgovError extends Error {
 
 export interface EgovClientOptions {
   baseUrl?: string;
+  /** 中継の URL（例 https://jp-law-mcp.vercel.app/api/egov）と合言葉。指定すると e-Gov ではなく中継に問い合わせる */
+  proxy?: { url: string; key: string };
   fetchImpl?: typeof fetch;
   maxConcurrent?: number;
   cacheTtlMs?: number;
@@ -91,6 +95,7 @@ export const BLOCKED_MESSAGE = "e-Gov 法令APIが応答を制限しているか
 
 export class EgovClient {
   private readonly baseUrl: string;
+  private readonly proxy?: { url: string; key: string };
   private readonly fetchImpl: typeof fetch;
   private readonly maxConcurrent: number;
   private readonly cacheTtlMs: number;
@@ -108,6 +113,7 @@ export class EgovClient {
 
   constructor(opts: EgovClientOptions = {}) {
     this.baseUrl = opts.baseUrl ?? EGOV_API;
+    this.proxy = opts.proxy;
     this.fetchImpl = opts.fetchImpl ?? fetch;
     this.maxConcurrent = opts.maxConcurrent ?? 2;
     this.cacheTtlMs = opts.cacheTtlMs ?? 10 * 60_000;
@@ -142,12 +148,8 @@ export class EgovClient {
 
   /** 法令の全文（簡易版 JSON）。大きい（租税特別措置法で約 700 万字）ので結果を保存しない。 */
   fullLaw(lawId: string, asof?: string): Promise<LawDataResponse> {
-    const u = new URL(`${this.baseUrl}/law_data/${encodeURIComponent(lawId)}`);
-    u.searchParams.set("json_format", "light");
-    u.searchParams.set("omit_amendment_suppl_provision", "true");
-    if (asof) u.searchParams.set("asof", asof);
-    u.searchParams.set("response_format", "json");
-    return this.limited(() => this.fetchJson<LawDataResponse>(u.toString()));
+    const url = this.urlFor(`/law_data/${encodeURIComponent(lawId)}`, { json_format: "light", omit_amendment_suppl_provision: "true", asof });
+    return this.limited(() => this.fetchJson<LawDataResponse>(url));
   }
 
   /** 条単位の本文。articleNum は "8" や "36_2"。asof 省略時は現行。 */
@@ -157,11 +159,44 @@ export class EgovClient {
     });
   }
 
-  private get<T>(path: string, params: Record<string, string | undefined>): Promise<T> {
-    const u = new URL(this.baseUrl + path);
+  /**
+   * 中継用: e-Gov の URL（パスと問い合わせ）をそのまま送り、状態と本文を返す。送り方の制限と制限検知は他と同じ。
+   * 制限中は e-Gov に送らず 503 と {"code":"blocked"} を返す（受け手の EgovClient は 503 を制限中として扱う）。
+   */
+  passthrough(pathAndQuery: string): Promise<{ status: number; body: string }> {
+    const blocked = { status: 503, body: JSON.stringify({ code: "blocked", message: BLOCKED_MESSAGE }) };
+    return this.limited(async () => {
+      if (this.now() < this.blockedUntil) return blocked;
+      const ctrl = new AbortController();
+      const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
+      try {
+        const res = await this.fetchImpl(this.baseUrl + pathAndQuery, {
+          signal: ctrl.signal, headers: { Accept: "application/json", "User-Agent": USER_AGENT }, redirect: "manual",
+        });
+        if (isBlockSignal(res)) {
+          this.blockedUntil = this.now() + this.blockedMs;
+          return blocked;
+        }
+        return { status: res.status, body: await res.text() };
+      } catch (e) {
+        return { status: 502, body: JSON.stringify({ message: ctrl.signal.aborted ? `e-Gov 法令APIが ${this.timeoutMs / 1000} 秒以内に応答しませんでした` : `e-Gov 法令APIに接続できませんでした: ${(e as Error).message}` }) };
+      } finally {
+        clearTimeout(timer);
+      }
+    });
+  }
+
+  /** e-Gov のパスと問い合わせから送り先の URL を作る（中継を使うときは中継の ?p=パス&…） */
+  private urlFor(path: string, params: Record<string, string | undefined>): string {
+    const u = new URL(this.proxy ? this.proxy.url : this.baseUrl + path);
+    if (this.proxy) u.searchParams.set("p", path);
     for (const [k, v] of Object.entries(params)) if (v) u.searchParams.set(k, v);
     u.searchParams.set("response_format", "json");
-    const key = u.toString();
+    return u.toString();
+  }
+
+  private get<T>(path: string, params: Record<string, string | undefined>): Promise<T> {
+    const key = this.urlFor(path, params);
     const hit = this.cache.get(key);
     if (hit && this.now() - hit.at < this.cacheTtlMs) return hit.value as Promise<T>;
     const value = this.limited(() => this.fetchJson<T>(key));
@@ -192,15 +227,16 @@ export class EgovClient {
     const timer = setTimeout(() => ctrl.abort(), this.timeoutMs);
     let res: Response;
     try {
-      res = await this.fetchImpl(url, { signal: ctrl.signal, headers: { Accept: "application/json", "User-Agent": USER_AGENT }, redirect: "manual" });
+      const headers: Record<string, string> = { Accept: "application/json", "User-Agent": USER_AGENT };
+      if (this.proxy) headers["x-jp-law-mcp-key"] = this.proxy.key;
+      res = await this.fetchImpl(url, { signal: ctrl.signal, headers, redirect: "manual" });
     } catch (e) {
       throw new EgovError(ctrl.signal.aborted ? `e-Gov 法令APIが ${this.timeoutMs / 1000} 秒以内に応答しませんでした`
         : `e-Gov 法令APIに接続できませんでした: ${(e as Error).message}`);
     } finally {
       clearTimeout(timer);
     }
-    const type = res.headers.get("content-type") ?? "";
-    if ((res.status >= 300 && res.status < 400) || res.status === 429 || res.status === 503 || /text\/html/i.test(type)) {
+    if (isBlockSignal(res)) {
       // 回数制限・保守のときはエラーページへ転送される。しばらく送らない
       this.blockedUntil = this.now() + this.blockedMs;
       throw new EgovError(BLOCKED_MESSAGE, "blocked", res.status);
@@ -217,6 +253,12 @@ export class EgovClient {
     }
     return body as T;
   }
+}
+
+/** 転送（エラーページへ）・429・503・HTML は回数制限か保守のしるし */
+function isBlockSignal(res: Response): boolean {
+  const type = res.headers.get("content-type") ?? "";
+  return (res.status >= 300 && res.status < 400) || res.status === 429 || res.status === 503 || /text\/html/i.test(type);
 }
 
 /** e-Gov 法令検索の閲覧ページ。改正版 ID があればその版のページ。 */

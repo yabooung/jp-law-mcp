@@ -4,7 +4,9 @@
  *
  *   node scripts/smoke_remote.mjs [--url https://jp-law-mcp.vercel.app/mcp] [--wait 900]
  *
- * --wait 秒のあいだ 30 秒おきに確かめ、出力の「YYYY-MM-DD 時点」が SOURCE.json の snapshot になったら終了コード 0。
+ * --wait 秒のあいだ 30 秒おきに確かめ、出力の「YYYY-MM-DD 時点」が SOURCE.json の snapshot になったら、
+ * 最後に get_article を 1 回だけ呼んで e-Gov が答えるか（遠隔コネクタの送り元が制限されていないか）を見る。
+ * 制限されていたら終了コード 2（毎日の Actions が失敗を知らせる）。
  */
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
@@ -40,6 +42,16 @@ for (;;) {
   }
   if (res.ok) {
     console.log(`ok: ツール ${res.tools} 個、${want} 時点のグラフ`);
+    const c = new Client({ name: "jp-law-mcp-smoke", version: "0" });
+    await c.connect(new StreamableHTTPClientTransport(new URL(a.url)));
+    const r = await c.callTool({ name: "get_article", arguments: { law: "行政手続法", article: "8" } });
+    await c.close();
+    const text = r.content.map((x) => x.text).join("\n");
+    if (r.isError) {
+      console.error(`e-Gov を使う get_article が失敗:\n${text.slice(0, 300)}`);
+      process.exit(2);
+    }
+    console.log(`ok: get_article（${text.split("\n")[0]}）`);
     process.exit(0);
   }
   if (Date.now() >= deadline) {

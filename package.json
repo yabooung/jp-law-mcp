@@ -1,19 +1,29 @@
 {
   "name": "jp-law-mcp",
-  "version": "0.1.0",
-  "private": true,
+  "version": "0.2.0",
   "description": "日本の行政実務向け 法令・国会会議録 MCP サーバー",
   "type": "module",
   "bin": {
     "jp-law-mcp": "build/index.js"
   },
+  "files": [
+    "build/",
+    "!build/http.*",
+    "!build/egov-proxy.*",
+    "data/graph.json.gz",
+    "data/law_names.json.gz",
+    "data/structure.json.gz",
+    "data/SOURCE.json",
+    "DATA_LICENSE.md"
+  ],
   "scripts": {
     "build": "tsc",
     "test": "vitest run",
-    "test:live": "LIVE=1 vitest run test/live"
+    "test:live": "LIVE=1 vitest run test/live",
+    "prepublishOnly": "npm run build && npm test"
   },
   "engines": {
-    "node": "24.x"
+    "node": ">=20"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.32.1",
@@ -28,5 +38,13 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/yabooung/jp-law-mcp"
-  }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "japanese-law",
+    "e-gov",
+    "legal",
+    "法令"
+  ]
 }

@@ -25,10 +25,11 @@ export interface ServerDeps {
 export function createServer(deps: ServerDeps = {}): McpServer {
   const server = new McpServer({ name: "jp-law-mcp", version: VERSION });
   const egov = deps.egov ?? new EgovClient();
-  registerLawTools(server, egov, deps.today);
+  const names = deps.names ?? defaultNames;
+  registerLawTools(server, egov, deps.today, names);
   registerSearchTools(server, egov);
-  registerVerifyTools(server, egov, deps.names ?? defaultNames, deps.structure ?? defaultStructure);
-  registerGraphTools(server, deps.graph ?? defaultGraph, egov);
+  registerVerifyTools(server, egov, names, deps.structure ?? defaultStructure);
+  registerGraphTools(server, deps.graph ?? defaultGraph, egov, names);
   registerDietTools(server, deps.kokkai ?? new KokkaiClient());
   return server;
 }

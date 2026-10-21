@@ -88,6 +88,24 @@ describe("rendering", () => {
 });
 
 describe("tools", () => {
+  it("resolves a full name or abbreviation from the bundled dictionary without calling e-Gov /laws", async () => {
+    for (const law of ["行政手続法", "行手法"]) {
+      const log: URL[] = [];
+      const { call } = await connect(defaultRoute, log);
+      const r = await call("get_article", { law, article: "2" });
+      expect(r.isError).toBe(false);
+      expect(r.text).toContain("法令ID 405AC0000000088");
+      expect(log.some((u) => u.pathname.endsWith("/laws"))).toBe(false);
+    }
+  });
+
+  it("falls back to e-Gov /laws for a name not in the dictionary", async () => {
+    const log: URL[] = [];
+    const { call } = await connect(defaultRoute, log);
+    await call("get_article", { law: "行政手続", article: "2" });
+    expect(log.some((u) => u.pathname.endsWith("/laws"))).toBe(true);
+  });
+
   it("find_law lists candidates with ids", async () => {
     const { call } = await connect();
     const r = await call("find_law", { title: "行政手続法" });

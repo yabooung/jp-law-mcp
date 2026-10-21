@@ -16,14 +16,15 @@ https://jp-law-mcp.vercel.app/mcp
 
 - **Claude（claude.ai・デスクトップ）**: 設定 → コネクタ → カスタムコネクタを追加 で上の URL を入れる
 - **Claude Code**: `claude mcp add --transport http jp-law https://jp-law-mcp.vercel.app/mcp`
-- **自分の PC で動かす**（stdio）:
-  ```bash
-  git clone https://github.com/yabooung/jp-law-mcp && cd jp-law-mcp
-  npm install && npm run build
-  claude mcp add jp-law -- node "$(pwd)/build/index.js"
-  ```
+- **自分の PC で動かす**（stdio、Node.js 20 以降）: `npx -y jp-law-mcp`
+  - Claude Code: `claude mcp add jp-law -- npx -y jp-law-mcp`
+  - Claude デスクトップなど（設定ファイル）: `{"mcpServers": {"jp-law": {"command": "npx", "args": ["-y", "jp-law-mcp"]}}}`
+  - 外部 API へは自分の回線から問い合わせるので、試験公開の接続先の回数制限を受けません。たくさん使う場合はこちらを勧めます
 
-試験公開の接続先は、外部 API への負担を抑えるため送信元ごとに毎分 60 件までです。
+試験公開の接続先は、外部 API への負担を抑えるため利用者ごとに毎分 60 件までです。利用者は送信元 IP で分けます。
+組織のプロキシや AI サービスの中継のように多くの人が同じ送信元になる場合は、接続 URL に `?u=` と任意の文字列
+（英数字・`_`・`-`、64 字まで。例 `https://jp-law-mcp.vercel.app/mcp?u=tanaka-01`）を付けると、その文字列ごとに数えます
+（同じ送信元の合計は毎分 600 件まで）。認証ではないので、他人に知られても困らない文字列にしてください。
 
 ### 例
 

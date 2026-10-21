@@ -4,6 +4,7 @@ import { z } from "zod";
 import { articleLabel, parseArticleNumber } from "../lib/article.js";
 import { EgovClient, LAW_ID_RE, egovLawUrl } from "../sources/egov.js";
 import { CitationGraph, REL_DELEGATES } from "../sources/graph.js";
+import type { LawNames } from "../sources/names.js";
 import { UserError, resolveLaw } from "./law.js";
 
 type Text = { content: Array<{ type: "text"; text: string }>; isError?: boolean };
@@ -45,15 +46,15 @@ function groupByLaw(g: CitationGraph, arts: Iterable<number>, maxLaws: number, m
   return out;
 }
 
-async function lawIdOf(g: CitationGraph, egov: EgovClient, law: string): Promise<string> {
+async function lawIdOf(g: CitationGraph, egov: EgovClient, law: string, names?: () => LawNames): Promise<string> {
   const q = law.normalize("NFKC").trim();
   if (LAW_ID_RE.test(q)) return q;
   const hits = g.findLawsByTitle(q);
   if (hits.length === 1) return g.lawId(hits[0]);
-  return (await resolveLaw(egov, q)).lawId; // 略称・部分一致は e-Gov で
+  return (await resolveLaw(egov, q, names?.())).lawId; // 略称は法令名辞書、部分一致は e-Gov で
 }
 
-export function registerGraphTools(server: McpServer, graph: () => CitationGraph, egov: EgovClient): void {
+export function registerGraphTools(server: McpServer, graph: () => CitationGraph, egov: EgovClient, names?: () => LawNames): void {
   server.registerTool(
     "find_citing_provisions",
     {
@@ -73,7 +74,7 @@ export function registerGraphTools(server: McpServer, graph: () => CitationGraph
     async ({ law, article, include_same_law, depth, max_laws }) => {
       try {
         const g = graph();
-        const lawId = await lawIdOf(g, egov, law);
+        const lawId = await lawIdOf(g, egov, law, names);
         const li = g.findLaw(lawId);
         let targets: number[];
         let what: string;
@@ -140,7 +141,7 @@ export function registerGraphTools(server: McpServer, graph: () => CitationGraph
     async ({ law, article, max_laws }) => {
       try {
         const g = graph();
-        const lawId = await lawIdOf(g, egov, law);
+        const lawId = await lawIdOf(g, egov, law, names);
         const num = parseArticleNumber(article);
         if (!num) throw new UserError(`条番号「${article}」を読めませんでした。例: 8、第八条、36条の2`);
         const li = g.findLaw(lawId);

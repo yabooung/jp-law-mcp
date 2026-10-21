@@ -2,6 +2,7 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { articleLabel, diffLines, parseArticleNumber, renderArticle } from "../lib/article.js";
+import type { LawNames } from "../sources/names.js";
 import {
   ASOF_MIN, EGOV_SOURCE, EgovClient, EgovError, LAW_ID_RE, egovLawUrl,
   type LawDataResponse, type RevisionInfo,
@@ -21,10 +22,19 @@ const fail = (text: string): Text => ({ isError: true, content: [{ type: "text",
 
 export class UserError extends Error {}
 
-/** 法令ID ならそのまま、名前なら e-Gov で探して 1 件に絞る。絞れなければ候補を示して止める。 */
-export async function resolveLaw(client: EgovClient, law: string): Promise<{ lawId: string; title?: string }> {
+/**
+ * 法令ID ならそのまま。名前は、同梱の法令名辞書（data/law_names.json.gz）で正式名称か略称がちょうど 1 法令に
+ * 当たればそれを使い（e-Gov を呼ばない）、当たらなければ e-Gov で探して 1 件に絞る。絞れなければ候補を示して止める。
+ * 辞書は現行法令だけなので、廃止法令やスナップショット後の新法令・改題は e-Gov で探すことになる。
+ */
+export async function resolveLaw(client: EgovClient, law: string, names?: LawNames): Promise<{ lawId: string; title?: string }> {
   const q = law.normalize("NFKC").trim();
   if (LAW_ID_RE.test(q)) return { lawId: q };
+  const local = new Set((names?.lookup(q) ?? []).filter((h) => h.kind === "canonical" || h.kind === "abbrev").map((h) => h.lawId));
+  if (local.size === 1) {
+    const [lawId] = local;
+    return { lawId, title: names!.titleOf(lawId) };
+  }
   const res = await client.searchLaws(q, { limit: 20 });
   const laws = res.laws;
   if (laws.length === 0) throw new UserError(`「${q}」に当たる法令が見つかりません（NOT_FOUND）。正式名称・略称・法令IDで指定してください。`);
@@ -58,16 +68,19 @@ function checkAsof(asof?: string): void {
   }
 }
 
-async function fetchArticle(client: EgovClient, law: string, article: string, asof?: string) {
+async function fetchArticle(client: EgovClient, law: string, article: string, asof?: string, names?: LawNames) {
   const num = parseArticleNumber(article);
   if (!num) throw new UserError(`条番号「${article}」を読めませんでした。例: 8、第八条、36条の2`);
   checkAsof(asof);
-  const { lawId } = await resolveLaw(client, law);
+  const { lawId } = await resolveLaw(client, law, names);
   const data: LawDataResponse = await client.article(lawId, num, asof);
   return { lawId, num, data, lines: renderArticle(data.law_full_text) };
 }
 
-export function registerLawTools(server: McpServer, client: EgovClient, today: () => string = () => new Date().toISOString().slice(0, 10)): void {
+export function registerLawTools(
+  server: McpServer, client: EgovClient, today: () => string = () => new Date().toISOString().slice(0, 10), names?: () => LawNames,
+): void {
+  const dict = () => names?.();
   server.registerTool(
     "find_law",
     {
@@ -114,8 +127,8 @@ export function registerLawTools(server: McpServer, client: EgovClient, today: (
     async ({ law, article, asof }) => {
       try {
         const [{ lawId, num, data, lines }, revs] = await Promise.all([
-          fetchArticle(client, law, article, asof),
-          resolveLaw(client, law).then(({ lawId }) => client.revisions(lawId)).catch(() => null),
+          fetchArticle(client, law, article, asof, dict()),
+          resolveLaw(client, law, dict()).then(({ lawId }) => client.revisions(lawId)).catch(() => null),
         ]);
         const r = data.revision_info;
         const out = [
@@ -159,7 +172,7 @@ export function registerLawTools(server: McpServer, client: EgovClient, today: (
     },
     async ({ law, limit }) => {
       try {
-        const { lawId } = await resolveLaw(client, law);
+        const { lawId } = await resolveLaw(client, law, dict());
         const res = await client.revisions(lawId);
         const title = res.revisions[0]?.law_title ?? lawId;
         const lines = [`${title}（${res.law_info.law_num}・法令ID ${lawId}）の改正履歴 ${res.revisions.length} 件`];
@@ -187,7 +200,7 @@ export function registerLawTools(server: McpServer, client: EgovClient, today: (
     },
     async ({ law, article, from, to }) => {
       try {
-        const [a, b] = await Promise.all([fetchArticle(client, law, article, from), fetchArticle(client, law, article, to)]);
+        const [a, b] = await Promise.all([fetchArticle(client, law, article, from, dict()), fetchArticle(client, law, article, to, dict())]);
         const ra = a.data.revision_info;
         const rb = b.data.revision_info;
         const head = [
