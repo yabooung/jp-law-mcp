@@ -52,6 +52,8 @@ def values(root: Path = ROOT) -> dict[str, str]:
         "structure.articles": _n(sum(len(x[3].split(";")) for x in st["laws"].values() if x[3])),
         "structure.mb": mb("structure.json.gz"),
     }
+    # 種類がその月に 0 件でも文書のキーは残す（施行予定の改題がない月がある）
+    v |= {f"names.{k}": "0" for k in ("canonical", "abbrev", "alias", "old_name", "promulgation", "new_name")}
     v |= {f"names.{k}": _n(c) for k, c in nc.items()}
     for split in ("dev", "test"):
         r = json.loads((root / f"eval/results/verify_{split}.json").read_text(encoding="utf-8"))
