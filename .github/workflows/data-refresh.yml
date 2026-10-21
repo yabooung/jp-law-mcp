@@ -17,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  id-token: write   # npm の trusted publishing（トークンを置かない）
 
 concurrency:
   group: data-refresh
@@ -77,6 +78,20 @@ jobs:
           git push origin HEAD:main
       - name: 接続先が新しいデータで動いているか
         run: node scripts/smoke_remote.mjs --wait 900
+      - name: npm パッケージと Claude デスクトップ拡張も同じデータで出す
+        # 版は「package.json の 2 桁 + スナップショット日」（例 0.2.20261101）。リポジトリの package.json は書き換えない。
+        # npmjs.com でこのワークフローを trusted publisher に登録し、リポジトリ変数 NPM_TRUSTED_PUBLISHING=true にしてから動く
+        if: vars.NPM_TRUSTED_PUBLISHING == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          base=$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")
+          v="$base.$(python -c "import json; print(json.load(open('data/SOURCE.json'))['snapshot'].replace('-', ''))")"
+          npm version "$v" --no-git-tag-version
+          sed -i "s/VERSION = \".*\"/VERSION = \"$v\"/" src/version.ts
+          npm publish --provenance --access public
+          python scripts/build_mcpb.py
+          gh release create "v$v" "work/jp-law-mcp-$v.mcpb" --target main --title "v$v"             --notes "Data refresh: $(python -c "import json; m=json.load(open('data/SOURCE.json')); print(f\"e-Gov {m['snapshot']} via jlawcite {m['jlawcite']}\")"). npm: jp-law-mcp@$v"
 
   health:
     # データが変わらない日も、接続先が動いていて e-Gov が答えるか（送り元が制限されていないか）を 1 回だけ確かめる
