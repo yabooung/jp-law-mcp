@@ -64,6 +64,10 @@ export async function handleEgovProxy(req: IncomingMessage, res: ServerResponse,
   const target = egovTarget(new URL(req.url ?? "/", "http://x").searchParams);
   if (!target) return send(400, JSON.stringify({ message: "unsupported e-Gov path or parameters" }));
   shared ??= new EgovClient();
+  const started = Date.now();
   const r = await (client ?? shared).passthrough(target);
-  send(r.status, r.body, cacheSeconds(target, r.status, new Date().toISOString().slice(0, 10)));
+  const seconds = cacheSeconds(target, r.status, new Date().toISOString().slice(0, 10));
+  send(r.status, r.body, seconds);
+  // CDN が保存した応答を返すときはここに来ないので、この行の数が e-Gov に届いた件数になる
+  console.log(JSON.stringify({ t: "egov", path: target.split("?")[0], status: r.status, cache: seconds, ms: Date.now() - started }));
 }
