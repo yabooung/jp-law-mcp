@@ -199,7 +199,8 @@ export async function verifyText(
       verdicts[i] = withNotes(c, v, t, data.law_info.law_num, egovLawUrl(c.lawId!, data.revision_info.law_revision_id));
     } catch (e) {
       if (e instanceof EgovError && (e.code === "404004" || e.code === "400021")) {
-        verdicts[i] = { mark: "❌", code: "no_article", text: `${c.raw} → ${title}に${articleLabel(c.article)}はありません${asof ? `（${asof} 時点）` : "（現行版）"}（NOT_FOUND）` };
+        const lastArt = asof ? undefined : structure.lastArticle(c.lawId!);
+        verdicts[i] = { mark: "❌", code: "no_article", text: `${c.raw} → ${title}に${articleLabel(c.article)}はありません${asof ? `（${asof} 時点）` : "（現行版）"}${lastArt ? `（本則は${articleLabel(lastArt)}まで — スナップショット ${structure.snapshot}）` : ""}（NOT_FOUND）` };
       } else if (snap) {
         verdicts[i] = { ...snap, text: `${snap.text}\n   e-Gov に問い合わせられなかったため、スナップショットで判定しました（${(e as Error).message}）` };
       } else {

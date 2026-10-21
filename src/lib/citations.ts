@@ -168,7 +168,8 @@ export function extractCitations(input: string, names: LawNames, defaultLawId?: 
       const label = `${same ? same[0] : parentIds.length === 1 ? abbr!.name : ""}${sub[1]}`;
       c.raw = `${label}${raw}`;
       if (target) {
-        Object.assign(c, target);
+        c.lawId = target.lawId;
+        c.lawName = label; // 書かれたとおりの名前（「同法施行令」）。正式名は注記で示す
         c.nameKind = "abbrev";
         if (bare) {
           if (!named || named.lawId !== parent || (prev?.lawId !== parent && prev?.lawId !== target.lawId)
