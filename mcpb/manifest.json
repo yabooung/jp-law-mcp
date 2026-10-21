@@ -1,0 +1,41 @@
+{
+  "manifest_version": "0.2",
+  "name": "jp-law-mcp",
+  "display_name": "日本の法令（jp-law-mcp）",
+  "version": "0.0.0",
+  "description": "日本の法令と国会会議録の MCP サーバー。条文の取得（時点指定）、改正履歴・新旧比較、本文検索、法令引用の実在確認、引用・委任の逆引き、国会会議録の発言検索。",
+  "author": {
+    "name": "yabooung",
+    "url": "https://github.com/yabooung"
+  },
+  "homepage": "https://github.com/yabooung/jp-law-mcp",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yabooung/jp-law-mcp"
+  },
+  "license": "Apache-2.0",
+  "keywords": ["japanese-law", "法令", "e-Gov", "国会会議録"],
+  "server": {
+    "type": "node",
+    "entry_point": "build/index.js",
+    "mcp_config": {
+      "command": "node",
+      "args": ["${__dirname}/build/index.js"],
+      "env": {}
+    }
+  },
+  "tools": [
+    { "name": "find_law", "description": "法令名・略称から法令ID・種別・現行/廃止を調べる" },
+    { "name": "get_article", "description": "条文を読む。asof でその日に施行されていた版" },
+    { "name": "law_history", "description": "改正履歴（施行日・改正法令・現行/過去/未施行）" },
+    { "name": "compare_article", "description": "同じ条の二つの時点の新旧比較" },
+    { "name": "search_law_text", "description": "本文の全文検索（空白区切り AND）" },
+    { "name": "verify_citations", "description": "文章中の法令引用の実在を確認（法令・条・項・号）" },
+    { "name": "find_citing_provisions", "description": "この条を引用・委任元として参照している条文（逆引き）" },
+    { "name": "find_cited_provisions", "description": "この条が引用している条・委任先の政令省令" },
+    { "name": "search_diet_records", "description": "国会会議録の発言検索" }
+  ],
+  "compatibility": {
+    "runtimes": { "node": ">=20.0.0" }
+  }
+}

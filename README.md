@@ -19,6 +19,7 @@ https://jp-law-mcp.vercel.app/mcp
 - **自分の PC で動かす**（stdio、Node.js 20 以降）: `npx -y jp-law-mcp`
   - Claude Code: `claude mcp add jp-law -- npx -y jp-law-mcp`
   - Claude デスクトップなど（設定ファイル）: `{"mcpServers": {"jp-law": {"command": "npx", "args": ["-y", "jp-law-mcp"]}}}`
+  - Claude デスクトップの拡張: [Releases](https://github.com/yabooung/jp-law-mcp/releases) の `jp-law-mcp-<版>.mcpb` を開く（Node.js は不要。デスクトップ版に入っているものを使う）
   - 外部 API へは自分の回線から問い合わせるので、試験公開の接続先の回数制限を受けません。たくさん使う場合はこちらを勧めます
 
 試験公開の接続先は、外部 API への負担を抑えるため利用者ごとに毎分 60 件までです。利用者は送信元 IP で分けます。
@@ -102,6 +103,7 @@ LIVE=1 npx vitest run test/live   # 実 API に数件だけ問い合わせる（
 node eval/verify_eval.mjs --gold <jlawcite の eval/v2/nta_gold.jsonl> --split dev   # 引用確認の評価（API は呼ばない）
 python scripts/refresh_data.py --work work   # data/ を jlawcite の最新スナップショットに（3 ファイルを同じ検索DBから。pip install jlawcite が必要）
 python scripts/render_docs.py                # README・DATA_LICENSE の数値と日付を data/・eval/results/ から埋める
+python scripts/build_mcpb.py                 # Claude デスクトップの拡張（work/jp-law-mcp-<版>.mcpb）
 ```
 
 ## ライセンス
