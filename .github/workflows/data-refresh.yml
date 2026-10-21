@@ -80,18 +80,22 @@ jobs:
         run: node scripts/smoke_remote.mjs --wait 900
       - name: npm パッケージと Claude デスクトップ拡張も同じデータで出す
         # 版は「package.json の 2 桁 + スナップショット日」（例 0.2.20261101）。リポジトリの package.json は書き換えない。
-        # npmjs.com でこのワークフローを trusted publisher に登録し、リポジトリ変数 NPM_TRUSTED_PUBLISHING=true にしてから動く
+        # このため手で出すコードの版は minor を上げる（0.3.0 …）。patch を上げても日付の版より小さく、latest にならない。
+        # npmjs.com でこのワークフローを trusted publisher（publish 許可）に登録済み（2026-10-21）。変数 NPM_TRUSTED_PUBLISHING=true で動く
         if: vars.NPM_TRUSTED_PUBLISHING == 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           base=$(node -p "require('./package.json').version.split('.').slice(0, 2).join('.')")
           v="$base.$(python -c "import json; print(json.load(open('data/SOURCE.json'))['snapshot'].replace('-', ''))")"
+          # 同じスナップショットで作り直したとき（force など）は、出した版を出し直さない（npm は同じ版を受け付けない）
+          if npm view "jp-law-mcp@$v" version >/dev/null 2>&1; then echo "jp-law-mcp@$v は公開済み"; exit 0; fi
           npm version "$v" --no-git-tag-version
           sed -i "s/VERSION = \".*\"/VERSION = \"$v\"/" src/version.ts
           npm publish --provenance --access public
           python scripts/build_mcpb.py
-          gh release create "v$v" "work/jp-law-mcp-$v.mcpb" --target main --title "v$v"             --notes "Data refresh: $(python -c "import json; m=json.load(open('data/SOURCE.json')); print(f\"e-Gov {m['snapshot']} via jlawcite {m['jlawcite']}\")"). npm: jp-law-mcp@$v"
+          gh release view "v$v" >/dev/null 2>&1 || gh release create "v$v" "work/jp-law-mcp-$v.mcpb" --target main --title "v$v" \
+            --notes "Data refresh: $(python -c "import json; m=json.load(open('data/SOURCE.json')); print(f\"e-Gov {m['snapshot']} via jlawcite {m['jlawcite']}\")"). npm: jp-law-mcp@$v"
 
   health:
     # データが変わらない日も、接続先が動いていて e-Gov が答えるか（送り元が制限されていないか）を 1 回だけ確かめる
