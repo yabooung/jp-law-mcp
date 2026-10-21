@@ -16,9 +16,9 @@
  *
  * e-Gov API は呼ばない（maxApiCalls: 0。CONTRIBUTING.md「外部 API の使い方」）。ツールは条・項・号の有無を
  * 同梱のスナップショット data/structure.json.gz で判定するので、評価はその判定そのものを測る。現行版での確かめ直しと
- * 抜粋は含まない。正解は e-Gov 2026-09-27 で作られ、同梱は 2026-10-19（両方で dev・test の数値は同じ、2026-10-21）。
+ * 抜粋は含まない。正解は e-Gov 2026-09-27 で作られた。測ったスナップショットは結果の source に書く（data/ を替えるたびに測り直す）。
  *
- *   python scripts/export_structure.py --db <jlawcite の検索DB jp_search.sqlite> --snapshot 2026-10-19
+ *   python scripts/refresh_data.py --work work   # data/ を最新に、正解は work/nta_gold.jsonl
  *   node eval/verify_eval.mjs --gold <jlawcite リポジトリの eval/v2/nta_gold.jsonl> --split dev
  */
 import { createHash } from "node:crypto";
@@ -183,6 +183,7 @@ const result = {
   source: `e-Gov snapshot ${st.snapshot} (data/structure.json.gz, no API calls)`,
 };
 mkdirSync("eval/results", { recursive: true });
+mkdirSync("eval/.cache", { recursive: true });
 writeFileSync(`eval/results/verify_${a.split}.json`, JSON.stringify(result, null, 1));
 writeFileSync(`eval/.cache/verify_${a.split}_detail.json`, JSON.stringify({
   false_alarm: falseAlarm.map((m) => ({ id: m.id, raw: m.citation.raw, code: m.verdict.code, text: m.verdict.text })),

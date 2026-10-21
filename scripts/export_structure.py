@@ -3,11 +3,11 @@
 verify_citations は条・項・号の実在をこのファイルで確かめ、e-Gov API は抜粋とスナップショット後の改正の確認にだけ使う
 （CONTRIBUTING.md「外部 API の使い方」）。評価（eval/verify_eval.mjs）も同じファイルを使う。
 
-形式: {"snapshot": "YYYY-MM-DD", "laws": {law_id: [題名, 法令番号, 現行=1/廃止=0, "条:項数:項ごとの号数:表の項;…"]}}
+形式: {"snapshot": "YYYY-MM-DD", "jlawcite": 版, "laws": {law_id: [題名, 法令番号, 現行=1/廃止=0, "条:項数:項ごとの号数:表の項;…"]}}
   例 "33:5:0,2,2:" = 第33条は 5 項、第2項・第3項に号が 2 つずつ、表の項なし。"36_2:1::1" = 第36条の2 は 1 項で、第1項が表。
 
-    python scripts/export_structure.py --db <jlawcite の検索DB jp_search.sqlite> --snapshot 2026-10-19
-    python scripts/export_structure.py --nodes <jlawcite のパイプライン出力 jp_nodes.jsonl> --snapshot <日付>
+    python scripts/export_structure.py --db <jlawcite の検索DB jp_search.sqlite> --jlawcite <版> --snapshot <日付>
+    python scripts/export_structure.py --nodes <jlawcite のパイプライン出力 jp_nodes.jsonl> --jlawcite <版> --snapshot <日付>
   検索DB（`jlawcite download` で取れる）にもノードの本文と法令の情報が入っているので、どちらからでも同じものができる。
 """
 from __future__ import annotations
@@ -43,6 +43,7 @@ def main() -> None:
     src = ap.add_mutually_exclusive_group(required=True)
     src.add_argument("--nodes", type=Path, help="jlawcite のパイプライン出力 jp_nodes.jsonl")
     src.add_argument("--db", type=Path, help="jlawcite の検索DB jp_search.sqlite")
+    ap.add_argument("--jlawcite", required=True, help="検索DBを作った jlawcite の版（例 2.5.0）")
     ap.add_argument("--snapshot", required=True, help="e-Gov スナップショットの日付（jlawcite release_stats.json の egov_snapshot）")
     ap.add_argument("--out", type=Path, default=Path("data/structure.json.gz"))
     a = ap.parse_args()
@@ -84,7 +85,7 @@ def main() -> None:
         out[law_id] = [*meta, ";".join(parts)]
     a.out.parent.mkdir(parents=True, exist_ok=True)
     with gzip.open(a.out, "wt", encoding="utf-8") as g:
-        json.dump({"snapshot": a.snapshot, "laws": out}, g, ensure_ascii=False, separators=(",", ":"))
+        json.dump({"snapshot": a.snapshot, "jlawcite": a.jlawcite, "laws": out}, g, ensure_ascii=False, separators=(",", ":"))
     print(f"法令 {len(out)}, 条 {sum(len(v) for v in order.values())} → {a.out} ({a.out.stat().st_size / 1e6:.1f} MB)")
 
 

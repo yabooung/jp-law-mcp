@@ -4,3 +4,4 @@ eval/.cache/
 
 .vercel
 .env*
+work/

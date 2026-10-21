@@ -1,0 +1,8 @@
+{
+ "hf_dataset": "yabooung/jp-law-citation-graph",
+ "snapshot": "2026-10-19",
+ "as_of": "20261020",
+ "jlawcite": "2.5.0",
+ "git_rev": "289f935",
+ "sha256": "238077bc024526b9ceef1f842099e50b62ad952bda0ca204e324541dbe415e41"
+}

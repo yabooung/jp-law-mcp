@@ -1,0 +1,79 @@
+name: data refresh
+
+# jlawcite（JLaw-CiteGraph）は毎月 e-Gov から作り直され、Hugging Face に日付のタグ付きで出る。毎日それを確かめ、
+# 新しければ data/ の 3 ファイルを同じ検索DBから作り直し、テスト・引用確認の評価（dev・test）・文書の数値を更新して
+# main にコミットする。main への push で Vercel の接続先も更新されるので、最後にそれを確かめる。
+# dev の評価が前回より悪くなったら（scripts/eval_gate.py）コミットせずに失敗する。e-Gov には問い合わせない。
+
+on:
+  schedule:
+    - cron: "30 21 * * *"   # 毎日 21:30 UTC（06:30 JST）
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "data/SOURCE.json と同じでも作り直す"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+
+concurrency:
+  group: data-refresh
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - id: check
+        run: python scripts/refresh_data.py --check
+
+  refresh:
+    needs: check
+    if: needs.check.outputs.changed == 'true' || inputs.force == true
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+          cache: npm
+      - run: pip install jlawcite
+      - name: data/ を最新の検索DBから作り直す
+        run: python scripts/refresh_data.py --work work
+      - run: npm ci
+      - run: npm run build
+      - run: npm test
+      - name: 引用確認の評価（dev）と前回との比較
+        run: |
+          git show HEAD:eval/results/verify_dev.json > work/base_dev.json
+          node eval/verify_eval.mjs --gold work/nta_gold.jsonl --split dev
+          python scripts/eval_gate.py --base work/base_dev.json --new eval/results/verify_dev.json
+      - name: 引用確認の評価（test）
+        # 設定は変えずに数値だけ測り直す（2026-10-21 決定）。test の結果は判定にも修正にも使わない
+        run: node eval/verify_eval.mjs --gold work/nta_gold.jsonl --split test --unseal
+      - name: 文書の数値
+        run: |
+          python scripts/render_docs.py
+          python scripts/render_docs.py --check
+      - name: コミット
+        run: |
+          git add data eval/results README.md DATA_LICENSE.md
+          if git diff --cached --quiet; then echo "変更なし"; exit 0; fi
+          s=$(python -c "import json; m=json.load(open('data/SOURCE.json')); print(f\"e-Gov {m['snapshot']} (jlawcite {m['jlawcite']}, as of {m['as_of']})\")")
+          git -c user.name="github-actions[bot]" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" \
+            commit -m "Data: $s — graph, law names and structure from one jlawcite search DB; eval re-run"
+          git push origin HEAD:main
+      - name: 接続先が新しいデータで動いているか
+        run: node scripts/smoke_remote.mjs --wait 900
