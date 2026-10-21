@@ -7,23 +7,23 @@
   "mcp": {
    "answered": 50,
    "gold_recall": {
-    "k": 72,
+    "k": 75,
     "n": 100,
-    "rate": 0.72
+    "rate": 0.75
    },
    "any_gold": {
-    "k": 45,
+    "k": 46,
     "n": 50,
-    "rate": 0.9
+    "rate": 0.92
    },
-   "citations": 284,
-   "citations_with_law": 230,
+   "citations": 279,
+   "citations_with_law": 259,
    "nonexistent": {
-    "k": 13,
-    "n": 284,
-    "rate": 0.0458
+    "k": 2,
+    "n": 279,
+    "rate": 0.0072
    },
-   "not_in_gold_existing": 110,
+   "not_in_gold_existing": 124,
    "used_tools": {
     "k": 36,
     "n": 50,
@@ -44,23 +44,23 @@
   "none": {
    "answered": 50,
    "gold_recall": {
-    "k": 66,
+    "k": 68,
     "n": 100,
-    "rate": 0.66
+    "rate": 0.68
    },
    "any_gold": {
-    "k": 42,
+    "k": 43,
     "n": 50,
-    "rate": 0.84
+    "rate": 0.86
    },
-   "citations": 251,
-   "citations_with_law": 211,
+   "citations": 246,
+   "citations_with_law": 230,
    "nonexistent": {
-    "k": 18,
-    "n": 251,
-    "rate": 0.0717
+    "k": 1,
+    "n": 246,
+    "rate": 0.0041
    },
-   "not_in_gold_existing": 121,
+   "not_in_gold_existing": 132,
    "used_tools": {
     "k": 0,
     "n": 50,
@@ -76,6 +76,81 @@
     "k": 25,
     "n": 50,
     "rate": 0.5
+   }
+  },
+  "mcp@v2": {
+   "answered": 50,
+   "gold_recall": {
+    "k": 73,
+    "n": 100,
+    "rate": 0.73
+   },
+   "any_gold": {
+    "k": 45,
+    "n": 50,
+    "rate": 0.9
+   },
+   "citations": 260,
+   "citations_with_law": 241,
+   "nonexistent": {
+    "k": 0,
+    "n": 260,
+    "rate": 0
+   },
+   "not_in_gold_existing": 112,
+   "used_tools": {
+    "k": 50,
+    "n": 50,
+    "rate": 1
+   },
+   "tool_calls": 170,
+   "conclusion": {
+    "不一致": 19,
+    "一致": 21,
+    "一部一致": 10
+   },
+   "conclusion_agree": {
+    "k": 21,
+    "n": 50,
+    "rate": 0.42
+   }
+  },
+  "mcp@v3": {
+   "answered": 50,
+   "gold_recall": {
+    "k": 72,
+    "n": 100,
+    "rate": 0.72
+   },
+   "any_gold": {
+    "k": 44,
+    "n": 50,
+    "rate": 0.88
+   },
+   "citations": 291,
+   "citations_with_law": 278,
+   "nonexistent": {
+    "k": 2,
+    "n": 291,
+    "rate": 0.0069
+   },
+   "not_in_gold_existing": 125,
+   "used_tools": {
+    "k": 50,
+    "n": 50,
+    "rate": 1
+   },
+   "tool_calls": 161,
+   "conclusion": {
+    "不一致": 17,
+    "一致": 23,
+    "一部一致": 9,
+    "判断不能": 1
+   },
+   "conclusion_agree": {
+    "k": 23,
+    "n": 50,
+    "rate": 0.46
    }
   }
  }

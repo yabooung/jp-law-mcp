@@ -19,7 +19,11 @@ import { LawStructure } from "../build/sources/structure.js";
 import { verifyText } from "../build/tools/verify.js";
 
 const { values: a } = parseArgs({
-  options: { split: { type: "string", default: "tune" }, unseal: { type: "boolean", default: false }, dump: { type: "boolean", default: false } },
+  options: {
+    split: { type: "string", default: "tune" }, unseal: { type: "boolean", default: false }, dump: { type: "boolean", default: false },
+    // 直すときに見ていない答え（例 mcp@v2,mcp@v3）を全部使って測るときは --conds でその条件を、--split all を指定する
+    conds: { type: "string", default: "mcp,none" },
+  },
 });
 if (a.split === "holdout" && !a.unseal) throw new Error("holdout は封印中です。tune で直し終えたあと --unseal を付けて一度だけ実行します");
 const splitOf = (id) => (createHash("sha256").update(`jp-law-mcp/gate-eval/2026-10-21:${id}`).digest()[0] < 128 ? "tune" : "holdout");
@@ -30,10 +34,10 @@ const names = LawNames.load();
 const client = { async article() { throw new Error("評価では e-Gov を呼ばない"); } };
 
 const answers = [];
-for (const cond of ["mcp", "none"]) {
+for (const cond of a.conds.split(",")) {
   for (const l of readFileSync(`eval/.cache/answer_${cond}.jsonl`, "utf-8").split("\n").filter(Boolean)) {
     const r = JSON.parse(l);
-    if (r.answer && splitOf(r.id) === a.split) answers.push({ ...r, cond });
+    if (r.answer && (a.split === "all" || splitOf(r.id) === a.split)) answers.push({ ...r, cond });
   }
 }
 const tally = {};
@@ -57,4 +61,5 @@ console.log(JSON.stringify(result, null, 1));
 mkdirSync("eval/.cache", { recursive: true });
 writeFileSync(`eval/.cache/gate_${a.split}_detail.json`, JSON.stringify(out, null, 1));
 if (a.split === "holdout") writeFileSync("eval/results/gate_holdout.json", JSON.stringify(result, null, 1));
+if (a.split === "all") writeFileSync(`eval/results/gate_fresh.json`, JSON.stringify({ ...result, conds: a.conds }, null, 1));
 if (a.dump) for (const x of out) console.log(`${x.mark} ${x.code}\t${x.id}/${x.cond}\t${x.raw}\t…${x.ctx}`);

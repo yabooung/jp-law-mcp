@@ -19,6 +19,21 @@ import sys
 from pathlib import Path
 
 
+# 税務の実務・国税庁の資料で使う略称（「措法第37条の5」）。jlawcite の辞書にないので、ここで別称（alias）として足す。
+# 「法令」「法規」（法人税法施行令・施行規則）は一般の語と重なる（「関係法令第…」）ので入れない
+EXTRA_ALIASES = {
+    "措法": "租税特別措置法", "措令": "租税特別措置法施行令", "措規": "租税特別措置法施行規則",
+    "所法": "所得税法", "所令": "所得税法施行令", "所規": "所得税法施行規則",
+    "法法": "法人税法",
+    "消法": "消費税法", "消令": "消費税法施行令", "消規": "消費税法施行規則",
+    "相法": "相続税法", "相令": "相続税法施行令", "相規": "相続税法施行規則",
+    "通法": "国税通則法", "通令": "国税通則法施行令",
+    "徴法": "国税徴収法", "徴令": "国税徴収法施行令",
+    "地法": "地方税法", "地令": "地方税法施行令",
+    "耐用年数省令": "減価償却資産の耐用年数等に関する省令",
+}
+
+
 def main() -> int:
     sys.stdout.reconfigure(encoding="utf-8")
     ap = argparse.ArgumentParser()
@@ -31,6 +46,9 @@ def main() -> int:
     con = sqlite3.connect(f"file:{a.db.as_posix()}?mode=ro", uri=True)
     rows = [list(r) for r in con.execute("SELECT name, law_id, kind FROM law_names ORDER BY kind, name")]
     titles = dict(con.execute("SELECT law_id, title FROM laws"))
+    by_title = {t: lid for lid, t in titles.items()}
+    have_names = {r[0] for r in rows}
+    rows += [[abbr, by_title[t], "alias"] for abbr, t in EXTRA_ALIASES.items() if t in by_title and abbr not in have_names]
     pending = a.pending or a.db.with_name("pending_versions.csv")
     if not pending.exists():
         raise SystemExit(f"{pending} がない（jlawcite download が検索DBの隣に置く）")

@@ -2,6 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { articleLabel, diffLines, parseArticleNumber, renderArticle } from "../lib/article.js";
+import { subordinateCiting } from "../lib/subordinate.js";
+import type { CitationGraph } from "../sources/graph.js";
 import type { LawNames } from "../sources/names.js";
 import {
   ASOF_MIN, EGOV_SOURCE, EgovClient, EgovError, LAW_ID_RE, egovLawUrl,
@@ -93,6 +95,7 @@ async function fetchArticle(client: EgovClient, law: string, article: string, as
 
 export function registerLawTools(
   server: McpServer, client: EgovClient, today: () => string = () => new Date().toISOString().slice(0, 10), names?: () => LawNames,
+  graph?: () => CitationGraph,
 ): void {
   const dict = () => names?.();
   server.registerTool(
@@ -178,6 +181,9 @@ export function registerLawTools(
             for (const p of pending) out.push(`⚠ 施行予定の改正: ${versionLine(p)}${p.amendment_enforcement_comment ? `（${p.amendment_enforcement_comment}）` : ""}`);
           }
         }
+        // 現行の法律の条なら、この条を引用している施行令・施行規則の条を添える（委任先を記憶で書かないように）
+        const sub = !asof && graph ? subordinateCiting(graph(), lawId, num) : undefined;
+        if (sub) out.push(`この条を引用している施行令・施行規則: ${sub}（引用グラフ ${graph!().meta.egov_snapshot} 時点。get_article で読めます）`);
         out.push(`原文: ${egovLawUrl(lawId, r.law_revision_id)}`, FOOTER);
         return ok(out.join("\n"));
       } catch (e) {

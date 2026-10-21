@@ -22,8 +22,8 @@
   "extra_not_in_gold": 32,
   "extra_by_code": {
    "old_version": 7,
-   "inferred_missing": 9,
-   "ok": 16
+   "inferred_missing": 8,
+   "ok": 17
   }
  },
  "B": {
@@ -86,14 +86,14 @@
   "citations": 628,
   "by_mark": {
    "ℹ": 58,
-   "⚠": 17,
-   "✅": 553
+   "⚠": 14,
+   "✅": 556
   },
   "by_code": {
    "no_law_name": 54,
-   "unknown_law": 12,
-   "old_version": 4,
-   "ok": 553,
+   "old_version": 8,
+   "unknown_law": 5,
+   "ok": 556,
    "item_in_table": 1,
    "suppl_provision": 4
   }

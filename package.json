@@ -1,6 +1,6 @@
 {
   "name": "jp-law-mcp",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "日本の行政実務向け 法令・国会会議録 MCP サーバー",
   "type": "module",
   "bin": {

@@ -29,7 +29,9 @@ const SUB = /(施行令|施行規則)$/;
 // 法令名のない「第N条」を、同じ段落（空行で区切られる）でその前に名前を書いた法令とみなす（推定）。この長さより離れたら推定しない
 const INFER_WINDOW = 400;
 // 直前の引用から引き継ぐ、法令についての状態
-const LAW_ISSUES: CitationIssue[] = ["no_law_name", "unknown_law", "ambiguous_law", "old_version", "suppl_provision"];
+const LAW_ISSUES: CitationIssue[] = ["no_law_name", "unknown_law", "ambiguous_law", "old_version", "suppl_provision", "out_of_scope"];
+// 地方公共団体の条例（「東京都迷惑防止条例」）。国の法令の辞書にはないが、架空の名前ではない
+const LOCAL_ORDINANCE = /(?:都|道|府|県|市|区|町|村)[一-龥ァ-ヶー・]{0,40}条例$/;
 // 法令名の直前に付いても法令名の一部ではない語（「上記民法第…」）。これ以外の漢字が直前に付くと、
 // 辞書の名前は実は別の（存在しないかもしれない）法令名の末尾かもしれない（「地方行政手続法」→「行政手続法」と誤認しない）
 const PREFIX_OK = new Set(["上記", "前記", "後記", "当該", "現行", "改正後", "改正前", "新", "旧", "同", "本", "各", "前掲", "前述", "右記", "左記", "関係", "特に", "例"]);
@@ -37,7 +39,8 @@ const KANJI_END = /[一-龥ァ-ヶー]$/;
 
 /** old_version: 「旧所得税法」「改正前の民法」— 現行版ではなく改正前の版の条。suppl_provision: 附則の条 */
 /** inferred_law: 法令名がなく、同じ段落で直前に名前を書いた法令とみなしたもの（推定。条がなくても「ない」とは言い切らない） */
-export type CitationIssue = "no_law_name" | "unknown_law" | "ambiguous_law" | "promulgation_mismatch" | "old_version" | "suppl_provision" | "inferred_law";
+/** out_of_scope: 条例など、国の法令ではないもの（実在は確かめない） */
+export type CitationIssue = "no_law_name" | "unknown_law" | "ambiguous_law" | "promulgation_mismatch" | "old_version" | "suppl_provision" | "inferred_law" | "out_of_scope";
 
 export interface Citation {
   raw: string;
@@ -239,7 +242,7 @@ export function extractCitations(input: string, names: LawNames, defaultLawId?: 
       if (guess) {
         c.lawName = guess;
         c.raw = `${guess}${paren ? paren[0] : ""}${raw}`;
-        c.issues.push("unknown_law");
+        c.issues.push(LOCAL_ORDINANCE.test(guess) ? "out_of_scope" : "unknown_law");
       } else if (defaultLawId) {
         c.lawId = defaultLawId;
       } else if (named && prev?.lawId === named.lawId && p - named.end <= INFER_WINDOW && !/\n\s*\n/.test(text.slice(named.end, p))) {

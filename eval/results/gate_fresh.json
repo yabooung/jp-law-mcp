@@ -1,0 +1,20 @@
+{
+ "split": "all",
+ "date": "2026-10-21",
+ "answers": 100,
+ "citations": 551,
+ "by_mark": {
+  "✅": 514,
+  "ℹ": 32,
+  "⚠": 3,
+  "❌": 2
+ },
+ "by_code": {
+  "ok": 514,
+  "no_law_name": 32,
+  "inferred_missing": 3,
+  "no_item": 2
+ },
+ "source": "e-Gov snapshot 2026-10-20",
+ "conds": "mcp@v2,mcp@v3"
+}

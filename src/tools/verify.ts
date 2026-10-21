@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { articleLabel } from "../lib/article.js";
 import { extractCitations, type Citation } from "../lib/citations.js";
+import { otherCitations } from "../lib/others.js";
 import { ASOF_MIN, EGOV_SOURCE, EgovClient, EgovError, LAW_ID_RE, egovLawUrl, type LawDataResponse } from "../sources/egov.js";
 import type { LawNames } from "../sources/names.js";
 import type { LawStructure } from "../sources/structure.js";
@@ -17,7 +18,7 @@ const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD 形式");
 export type VerdictCode =
   | "ok" | "repealed" | "no_article" | "no_paragraph" | "no_item"
   | "unknown_law" | "ambiguous_law" | "promulgation_mismatch" | "no_law_name" | "old_version" | "suppl_provision" | "item_in_table" | "fetch_error"
-  | "inferred_missing";
+  | "inferred_missing" | "out_of_scope";
 export type Verdict = { mark: "✅" | "❌" | "⚠" | "ℹ"; code: VerdictCode; text: string };
 export interface VerifyResult { total: number; apiCalls: number; checked: Array<{ citation: Citation; verdict: Verdict }> }
 
@@ -91,6 +92,9 @@ function nameVerdict(c: Citation, dict: LawNames, asof?: string): Verdict | null
   if (c.issues.includes("suppl_provision")) {
     return { mark: "ℹ", code: "suppl_provision", text: `${c.raw}（附則）→ 附則の条は確かめていません（附則は改正のたびに付くため、どの改正の附則かを本文で確認してください）` };
   }
+  if (c.issues.includes("out_of_scope")) {
+    return { mark: "ℹ", code: "out_of_scope", text: `${c.raw}（条例）→ 条例は確かめていません（確かめるのは国の法令だけです）。自治体の例規集で確認してください` };
+  }
   if (c.issues.includes("no_law_name")) {
     return { mark: "ℹ", code: "no_law_name", text: `${c.raw}（法令名なし）→ 同じ法令の中の参照かもしれません。default_law に法令を指定すると確認できます` };
   }
@@ -158,6 +162,27 @@ export async function verifyText(
     return true;
   }).slice(0, MAX_CITATIONS);
 
+  // 推定した法令にその条・項・号がなければ、この文章で名前を書いた他の法令（とその施行令・施行規則）のうち、
+  // それがある法令がちょうど一つならそちらとみなす（推定のまま）。二つ以上なら決めずに候補を示す
+  const named = [...new Set(all.filter((c) => c.lawId && !c.issues.includes("inferred_law")).map((c) => c.lawId!))];
+  const fits = (lawId: string, c: Citation) => {
+    const shape = structure.article(lawId, c.article);
+    return !!shape && !judge(c, "", { ...shape, caption: "" });
+  };
+  const alternatives = new Map<Citation, string[]>();
+  for (const c of cites) {
+    if (asof || !c.issues.includes("inferred_law") || !c.lawId || fits(c.lawId, c)) continue;
+    const sub = /^(?:同法?)?(施行令|施行規則)第/.exec(c.raw)?.[1];
+    const pool = sub
+      ? named.map((id) => dict.titleOf(id)).filter(Boolean).flatMap((t) => dict.lookup(`${t}${sub}`).map((h) => h.lawId))
+      : named;
+    const ok = [...new Set(pool)].filter((id) => id !== c.lawId && fits(id, c));
+    if (ok.length === 1) {
+      c.lawId = ok[0];
+      c.lawName = dict.titleOf(ok[0]);
+    } else if (ok.length > 1) alternatives.set(c, ok);
+  }
+
   const verdicts: Array<Verdict | undefined> = cites.map((c) => nameVerdict(c, dict, asof) ?? undefined);
   const jobs = new Map<number, Job>();
   cites.forEach((c, i) => {
@@ -220,9 +245,10 @@ export async function verifyText(
     const v = verdicts[i]!;
     if (!c.issues.includes("inferred_law")) return;
     const title = dict.titleOf(c.lawId!) ?? c.lawName ?? "";
-    const note = `法令名がないため、前に書かれた${title}の条とみなしました`;
+    const note = `法令名がないため、この文章で名前が出た${title}の条とみなしました（推定）`;
+    const alt = alternatives.get(c)?.map((id) => dict.titleOf(id) ?? id).join("・");
     verdicts[i] = v.mark === "❌"
-      ? { mark: "⚠", code: "inferred_missing", text: `${v.text}\n   ${note}。別の法令の条かもしれないので、法令名を付けて確かめてください` }
+      ? { mark: "⚠", code: "inferred_missing", text: `${v.text}\n   ${note}。${alt ? `この条があるのは ${alt} です。` : ""}別の法令の条かもしれないので、法令名を付けて確かめてください` }
       : { ...v, text: `${v.text}\n   ${note}` };
   });
 
@@ -237,7 +263,8 @@ export function registerVerifyTools(server: McpServer, client: EgovClient, names
       description:
         "文章に含まれる法令引用（例: 行政手続法第八条第一項、所得税法（昭和四十年法律第三十三号）第五十七条の二）を取り出し、" +
         "法令・条・項・号が実在するか確かめます。法令名の誤り、存在しない条、括弧内の法令番号と名称の食い違い、廃止された法令を知らせ、" +
-        "照合用に条文の抜粋を付けます。AI が書いた回答や文書の引用を確認するときに使います。主張の内容が正しいかは判断しません。",
+        "照合用に条文の抜粋を付けます。AI が書いた回答や文書の引用を確認するときに使います。" +
+        "法令を挙げて答えるときは、答えを返す前に、挙げた引用をまとめてこのツールに渡してください（存在しない条を含む答えを返さないため）。主張の内容が正しいかは判断しません。",
       inputSchema: {
         text: z.string().min(1).max(20000).describe("確認する文章"),
         asof: DATE.optional().describe(`この日に施行されていた版で確認（${ASOF_MIN} 以降）。省略で現行`),
@@ -250,8 +277,18 @@ export function registerVerifyTools(server: McpServer, client: EgovClient, names
       }
       const st = structure();
       const res = await verifyText(text, { client, names: names(), structure: st, asof, defaultLaw: default_law });
+      // 通達・判例・条例・告示は確かめない。黙って飛ばさず、確かめていないことを示す
+      const named = new Set(res.checked.map((x) => x.citation.lawName).filter(Boolean));
+      const others = otherCitations(text.normalize("NFKC")).filter((o) => !named.has(o.raw));
+      const othersText = others.length
+        ? ["", `確かめていない引用（法令ではないもの）${others.length} 件: ` +
+          (["通達", "判例", "条例", "告示"] as const).map((k) => {
+            const xs = others.filter((o) => o.kind === k);
+            return xs.length ? `${k} ${xs.length} 件（${xs.slice(0, 5).map((o) => o.raw).join("、")}${xs.length > 5 ? " ほか" : ""}）` : "";
+          }).filter(Boolean).join("・") + "。このツールでは実在を確かめていません。原文で確認してください。"]
+        : [];
       if (res.checked.length === 0) {
-        return { content: [{ type: "text" as const, text: "法令の条の引用（「第N条」）は見つかりませんでした。" }] };
+        return { content: [{ type: "text" as const, text: ["法令の条の引用（「第N条」）は見つかりませんでした。", ...othersText].join("\n") }] };
       }
       const verdicts = res.checked.map((x) => x.verdict);
       const count = (m: Verdict["mark"]) => verdicts.filter((v) => v.mark === m).length;
@@ -263,7 +300,7 @@ export function registerVerifyTools(server: McpServer, client: EgovClient, names
         content: [{
           type: "text" as const,
           text: [
-            head, "", ...body, "",
+            head, "", ...body, ...othersText, "",
             `確認したのは法令・条・項・号の実在だけです。引用した主張が条文に合っているかは、抜粋と原文で確かめてください。` +
             `条・項・号の有無は e-Gov のスナップショット（${st.snapshot}）で調べ、そのうち最大 ${MAX_API_CALLS} 件を現行版で確かめて抜粋を付けています。出典: ${EGOV_SOURCE}`,
           ].join("\n"),

@@ -73,10 +73,13 @@ writeFileSync(mcpConfig, JSON.stringify({
 const CLAUDE = process.env.JP_LAW_MCP_CLAUDE ?? (process.platform === "win32" && process.env.APPDATA
   ? join(process.env.APPDATA, "npm", "node_modules", "@anthropic-ai", "claude-code", "bin", "claude.exe") : "claude");
 
+// 条件名は「種類@版」でもよい（例 mcp@v2: サーバーを直したあとの同じ条件。答えは別のファイルに貯める）
+const kindOf = (cond) => cond.split("@")[0];
+
 function ask(c, cond) {
   const args = ["-p", prompt(c), "--model", a.model, "--output-format", "stream-json", "--verbose", "--no-session-persistence",
     "--system-prompt", SYSTEM, "--tools", "", "--strict-mcp-config"];
-  if (cond === "mcp") args.push("--mcp-config", mcpConfig, "--allowedTools", "mcp__jp-law");
+  if (kindOf(cond) === "mcp") args.push("--mcp-config", mcpConfig, "--allowedTools", "mcp__jp-law");
   return run(args).then(({ events, code, err }) => {
     const tools = [];
     let result = null;
