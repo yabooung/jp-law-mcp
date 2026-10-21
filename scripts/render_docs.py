@@ -64,6 +64,10 @@ def values(root: Path = ROOT) -> dict[str, str]:
               f"{split}.flagged_kn": _kn(b["flagged"]),
               f"{split}.C_info": f"{c['by_mark'].get('ℹ', 0) / c['citations'] * 100:.1f}%",
               f"{split}.date": r["date"], f"{split}.cases": _n(r["cases"])}
+    # 要件の数値の突き合わせ（eval/quantity_eval.mjs。検索DBの本文が要るので手で測る）
+    qt = json.loads((root / "eval/results/quantity.json").read_text(encoding="utf-8"))
+    v |= {"qty.n": _n(qt["sentences"]), "qty.alert": _n(qt["false_alert"]["k"]), "qty.date": qt["date"],
+          "qty.detect": f"{qt['detect']['rate'] * 100:.1f}%", "qty.detect_kn": f"{qt['detect']['k']}/{qt['detect']['n']}"}
     # 基本通達の番号確認（eval/notice_eval.mjs）
     nt = json.loads((root / "eval/results/notice.json").read_text(encoding="utf-8"))
     v |= {"notice.fetched": nt["fetched"], "notice.checked": _n(nt["checked_unique"]), "notice.found": _n(nt["found"]),

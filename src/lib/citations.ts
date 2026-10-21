@@ -61,6 +61,8 @@ export interface Citation {
 const toHalf = (s: string) => s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
 // PDF から写した文章の「第21 条の２」のような数字まわりの空白を詰める
 const tighten = (s: string) => s.replace(/(\d)[ 　]+(?=[条項号の])/g, "$1").replace(/([条項号の])[ 　]+(?=\d)/g, "$1");
+/** 引用を探す前の文章（Citation.at はこの文章での位置） */
+export const citationText = (input: string) => tighten(toHalf(input));
 
 /** 文章の中で定めた略称 → law_id。定めの直前の名前が辞書で 1 つに決まるものだけ */
 function definedNames(text: string, names: LawNames): Map<string, string> {
@@ -94,7 +96,7 @@ function guessName(w: string): string | undefined {
 }
 
 export function extractCitations(input: string, names: LawNames, defaultLawId?: string): Citation[] {
-  const text = tighten(toHalf(input));
+  const text = citationText(input);
   const local = definedNames(text, names);
   const out: Citation[] = [];
   const last: Partial<Record<"法" | "令" | "規則", { lawId: string; lawName?: string }>> = {};

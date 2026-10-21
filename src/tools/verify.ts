@@ -2,7 +2,8 @@ import type { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { z } from "zod";
 
 import { articleLabel } from "../lib/article.js";
-import { extractCitations, type Citation } from "../lib/citations.js";
+import { citationText, extractCitations, type Citation } from "../lib/citations.js";
+import { missingQuantities, sentenceAt } from "../lib/quantities.js";
 import { otherCitations, type OtherCitation } from "../lib/others.js";
 import { normalizeNoticeNumber, type NoticeIndex } from "../sources/tsutatsu.js";
 import { ASOF_MIN, EGOV_SOURCE, EgovClient, EgovError, LAW_ID_RE, egovLawUrl, type LawDataResponse } from "../sources/egov.js";
@@ -214,6 +215,7 @@ export async function verifyText(
   const order = [...jobs.entries()].sort(([ia, a], [ib, b]) => Number(b.negative) - Number(a.negative) || ia - ib);
   const toApi = new Set(order.slice(0, maxApiCalls).map(([i]) => i));
   let apiCalls = 0;
+  const bodies = new Map<number, { title: string; text: string }>(); // detail のとき、数値の突き合わせに使う条の本文
   await Promise.all([...jobs.entries()].map(async ([i, job]) => {
     const { c, title, snap } = job;
     if (!toApi.has(i)) {
@@ -225,6 +227,10 @@ export async function verifyText(
       const data = await client.article(c.lawId!, c.article, asof);
       const t = data.revision_info.law_title || title;
       const { shape, paras } = apiShape(data);
+      if (excerpt > EXCERPT) {
+        bodies.set(i, { title: `${data.revision_info.law_title || title} ${articleLabel(c.article)}`, text: paras.map((p) =>
+          sentencesOf(p.ParagraphSentence) + asList(p.Item).map((it) => sentencesOf(it.ItemSentence)).join("")).join("") });
+      }
       const bad = judge(c, t, shape);
       const repeal = repealText(data.revision_info.repeal_status);
       const v: Verdict = bad ?? {
@@ -255,6 +261,25 @@ export async function verifyText(
       ? { mark: "⚠", code: "inferred_missing", text: `${v.text}\n   ${note}。${alt ? `この条があるのは ${alt} です。` : ""}別の法令の条かもしれないので、法令名を付けて確かめてください` }
       : { ...v, text: `${v.text}\n   ${note}` };
   });
+
+  // detail のとき: 引用を含む文の要件の数値（「5,000万円を超える」「5年以内」）が、同じ文で引用した条の本文の同じ種類の数値と
+  // 食い違えば、参考の注意を付ける（条はあるのに中身の数値を誤る幻覚に気づくため。計算の結果・別の条の数値のこともある）
+  if (excerpt > EXCERPT && bodies.size) {
+    const norm = citationText(text);
+    const bySentence = new Map<string, number[]>();
+    cites.forEach((c, i) => {
+      if (c.at == null || !bodies.has(i)) return;
+      const s = sentenceAt(norm, c.at);
+      bySentence.set(s, [...(bySentence.get(s) ?? []), i]);
+    });
+    for (const [sentence, idx] of bySentence) {
+      const miss = missingQuantities(sentence, idx.map((i) => bodies.get(i)!.text).join(""));
+      if (!miss.length || verdicts[idx[0]]!.mark !== "✅") continue;
+      const v = verdicts[idx[0]]!;
+      verdicts[idx[0]] = { ...v, text: `${v.text}\n   数値の確認（参考）: ${miss.map((q) => `「${q.raw}」`).join("・")}は、同じ文で引用した` +
+        `${idx.map((i) => bodies.get(i)!.title).join("・")}の本文の数値と合いません。計算の結果や別の条・別表の数値でなければ、条文で確かめてください` };
+    }
+  }
 
   return { total: all.length, apiCalls, checked: cites.map((citation, i) => ({ citation, verdict: verdicts[i]! })) };
 }
