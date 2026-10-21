@@ -56,6 +56,20 @@ export class LawStructure {
     }
     return arts.get(article) ?? null;
   }
+
+  /** 本則の最後の条（"372"・"36_2"）。「第N条まで」と知らせるため。条番号を数として比べる */
+  lastArticle(lawId: string): string | undefined {
+    if (this.article(lawId, "") === undefined) return undefined;
+    const key = (a: string) => a.split("_").map(Number);
+    let best: string | undefined;
+    for (const a of this.parsed.get(lawId)!.keys()) {
+      if (a === "0") continue;
+      const [x, y] = [key(a), best ? key(best) : [-1]];
+      const cmp = x.map((v, i) => v - (y[i] ?? -1)).find((d) => d !== 0) ?? x.length - y.length;
+      if (cmp > 0) best = a;
+    }
+    return best;
+  }
 }
 
 let cached: LawStructure | undefined;

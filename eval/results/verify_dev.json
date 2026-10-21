@@ -5,50 +5,41 @@
  "A": {
   "gold_articles": 1263,
   "found": {
-   "k": 1262,
+   "k": 1263,
    "n": 1263,
-   "rate": 0.9992
+   "rate": 1
   },
-  "missed_by_reason": {
-   "no_law_name": 1
-  },
-  "correct_citations_unique": 843,
+  "missed_by_reason": {},
+  "correct_citations_unique": 844,
   "false_alarm": {
    "k": 1,
-   "n": 843,
+   "n": 844,
    "rate": 0.0012
   },
   "false_alarm_by_code": {
    "no_item": 1
   },
-  "extra_not_in_gold": 11,
+  "extra_not_in_gold": 32,
   "extra_by_code": {
    "old_version": 7,
-   "ok": 4
+   "inferred_missing": 9,
+   "ok": 16
   }
  },
  "B": {
   "base_citations": 300,
-  "tests": 1460,
+  "tests": 1464,
   "flagged": {
-   "k": 1460,
-   "n": 1460,
+   "k": 1464,
+   "n": 1464,
    "rate": 1
   },
   "right_reason": {
-   "k": 1460,
-   "n": 1460,
+   "k": 1464,
+   "n": 1464,
    "rate": 1
   },
   "by_kind": {
-   "no_article_branch": {
-    "tests": 260,
-    "flagged": 260,
-    "right": 260,
-    "got": {
-     "no_article": 260
-    }
-   },
    "no_article_beyond": {
     "tests": 300,
     "flagged": 300,
@@ -80,21 +71,29 @@
     "got": {
      "promulgation_mismatch": 300
     }
+   },
+   "no_article_branch": {
+    "tests": 264,
+    "flagged": 264,
+    "right": 264,
+    "got": {
+     "no_article": 264
+    }
    }
   }
  },
  "C": {
-  "citations": 629,
+  "citations": 628,
   "by_mark": {
-   "ℹ": 70,
-   "⚠": 18,
-   "✅": 541
+   "ℹ": 58,
+   "⚠": 17,
+   "✅": 553
   },
   "by_code": {
-   "no_law_name": 66,
-   "unknown_law": 13,
+   "no_law_name": 54,
+   "unknown_law": 12,
    "old_version": 4,
-   "ok": 541,
+   "ok": 553,
    "item_in_table": 1,
    "suppl_provision": 4
   }

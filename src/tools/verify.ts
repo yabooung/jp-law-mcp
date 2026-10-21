@@ -16,7 +16,8 @@ const DATE = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "YYYY-MM-DD 形式");
 /** 判定の種類。評価（eval/verify_eval.mjs）はこの code で数える */
 export type VerdictCode =
   | "ok" | "repealed" | "no_article" | "no_paragraph" | "no_item"
-  | "unknown_law" | "ambiguous_law" | "promulgation_mismatch" | "no_law_name" | "old_version" | "suppl_provision" | "item_in_table" | "fetch_error";
+  | "unknown_law" | "ambiguous_law" | "promulgation_mismatch" | "no_law_name" | "old_version" | "suppl_provision" | "item_in_table" | "fetch_error"
+  | "inferred_missing";
 export type Verdict = { mark: "✅" | "❌" | "⚠" | "ℹ"; code: VerdictCode; text: string };
 export interface VerifyResult { total: number; apiCalls: number; checked: Array<{ citation: Citation; verdict: Verdict }> }
 
@@ -163,7 +164,8 @@ export async function verifyText(
     const at = `（スナップショット ${structure.snapshot} 時点）`;
     let snap: Verdict;
     if (shape === null) {
-      snap = { mark: "❌", code: "no_article", text: `${c.raw} → ${title}に${articleLabel(c.article)}はありません${at}` };
+      const lastArt = structure.lastArticle(c.lawId!);
+      snap = { mark: "❌", code: "no_article", text: `${c.raw} → ${title}に${articleLabel(c.article)}はありません（本則は${lastArt ? `${articleLabel(lastArt)}まで` : "条なし"}）${at}` };
     } else {
       const bad = judge(c, title, { ...shape, caption: "" });
       snap = bad ? { ...bad, text: `${bad.text}${at}` }
@@ -205,6 +207,17 @@ export async function verifyText(
       }
     }
   }));
+
+  // 法令名を文脈から推定した引用: 条・項・号がなくても「ない」と言い切らない（推定が違うかもしれない）
+  cites.forEach((c, i) => {
+    const v = verdicts[i]!;
+    if (!c.issues.includes("inferred_law")) return;
+    const title = dict.titleOf(c.lawId!) ?? c.lawName ?? "";
+    const note = `法令名がないため、前に書かれた${title}の条とみなしました`;
+    verdicts[i] = v.mark === "❌"
+      ? { mark: "⚠", code: "inferred_missing", text: `${v.text}\n   ${note}。別の法令の条かもしれないので、法令名を付けて確かめてください` }
+      : { ...v, text: `${v.text}\n   ${note}` };
+  });
 
   return { total: all.length, apiCalls, checked: cites.map((citation, i) => ({ citation, verdict: verdicts[i]! })) };
 }

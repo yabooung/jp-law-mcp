@@ -23,7 +23,11 @@ const DEFINE = /[（(。、]以下「([^」]{1,20})」と(?:いう|いいます)
 // 法令名のない「第N条」が直前の引用と区切り（、・及び・並びに・又は・若しくは・から・まで・〜）と項・号だけで
 // つながっていれば、直前の引用と同じ法令とみなす（「所得税法第33条、第34条」）。直前の引用の法令が分からなければ、
 // 分からないことも引き継ぐ（その前の別の法令に結び付けない）。改行をまたぐときは引き継がない
-const ENUM_GAP = /^(?:[、,，・ 　〜～~]|及び|並びに|又は|若しくは|から|まで|第?\d+[項号](?:の\d+)*|[イロハニホヘトチリヌルヲワカヨタレソツネナラム]|[（(]\d+[）)])*$/;
+const ENUM_GAP = /^(?:[、,，・ 　〜～~]|及び|並びに|又は|若しくは|および|ならびに|または|から|まで|本文|ただし書|ただし書き|前段|後段|柱書|柱書き|各号|第?\d+[項号](?:の\d+)*|[イロハニホヘトチリヌルヲワカヨタレソツネナラム]|[（(]\d+[）)])*$/;
+// 法律の下の政令・省令を、法律の名前を省いて書いたもの:「同法施行令」「同施行令」「措置法施行規則」「（所得税法…）施行令」
+const SUB = /(施行令|施行規則)$/;
+// 法令名のない「第N条」を、同じ段落（空行で区切られる）でその前に名前を書いた法令とみなす（推定）。この長さより離れたら推定しない
+const INFER_WINDOW = 400;
 // 直前の引用から引き継ぐ、法令についての状態
 const LAW_ISSUES: CitationIssue[] = ["no_law_name", "unknown_law", "ambiguous_law", "old_version", "suppl_provision"];
 // 法令名の直前に付いても法令名の一部ではない語（「上記民法第…」）。これ以外の漢字が直前に付くと、
@@ -32,7 +36,8 @@ const PREFIX_OK = new Set(["上記", "前記", "後記", "当該", "現行", "�
 const KANJI_END = /[一-龥ァ-ヶー]$/;
 
 /** old_version: 「旧所得税法」「改正前の民法」— 現行版ではなく改正前の版の条。suppl_provision: 附則の条 */
-export type CitationIssue = "no_law_name" | "unknown_law" | "ambiguous_law" | "promulgation_mismatch" | "old_version" | "suppl_provision";
+/** inferred_law: 法令名がなく、同じ段落で直前に名前を書いた法令とみなしたもの（推定。条がなくても「ない」とは言い切らない） */
+export type CitationIssue = "no_law_name" | "unknown_law" | "ambiguous_law" | "promulgation_mismatch" | "old_version" | "suppl_provision" | "inferred_law";
 
 export interface Citation {
   raw: string;
@@ -46,6 +51,8 @@ export interface Citation {
   item?: number;
   issues: CitationIssue[];
   candidates?: string[];
+  /** 「第N条」の位置（全角数字を半角にし、数字まわりの空白を詰めた後の文章で） */
+  at?: number;
 }
 
 const toHalf = (s: string) => s.replace(/[０-９]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0xfee0));
@@ -90,6 +97,9 @@ export function extractCitations(input: string, names: LawNames, defaultLawId?: 
   const last: Partial<Record<"法" | "令" | "規則", { lawId: string; lawName?: string }>> = {};
   let prev: Citation | undefined;
   let prevEnd = -1;
+  // 名前を書いて（推定ではなく）法令が決まった最後の引用。段落をまたいだら使わない
+  let named: { lawId: string; lawName?: string; end: number } | undefined;
+  const lastAct = () => last["法"];
 
   for (const m of text.matchAll(REF)) {
     const p = m.index ?? 0;
@@ -105,11 +115,18 @@ export function extractCitations(input: string, names: LawNames, defaultLawId?: 
       if (c.lawId) {
         const t = names.titleOf(c.lawId) ?? c.lawName ?? "";
         last[/規則$/.test(t) ? "規則" : /令$/.test(t) ? "令" : "法"] = { lawId: c.lawId, lawName: c.lawName };
+        if (!c.issues.includes("inferred_law")) named = { lawId: c.lawId, lawName: c.lawName, end };
       }
+    };
+    // 法律 lawId の施行令・施行規則（辞書に「<法律の題名>施行令」があるときだけ）
+    const subOf = (lawId: string | undefined, kind: string) => {
+      const t = lawId && names.titleOf(lawId);
+      const ids = t ? [...new Set(names.lookup(`${t}${kind}`).map((h) => h.lawId))] : [];
+      return ids.length === 1 ? { lawId: ids[0], lawName: `${t}${kind}` } : undefined;
     };
 
     if (m[1]) { // 同条
-      if (prev) push({ ...prev, raw, paragraph, item, issues: [...prev.issues] });
+      if (prev) push({ ...prev, raw, paragraph, item, issues: [...prev.issues], at: p });
       continue;
     }
     const nums = [m[2], ...(m[3] ? m[3].split("の").filter(Boolean) : [])].map((x) => kanjiToNumber(x));
@@ -125,7 +142,7 @@ export function extractCitations(input: string, names: LawNames, defaultLawId?: 
       w = w.slice(0, paren.index);
     }
     w = w.replace(/の$/, "");
-    const c: Citation = { raw, article, paragraph, item, issues: [], promulgation };
+    const c: Citation = { raw, article, paragraph, item, issues: [], promulgation, at: p };
 
     const same = SAME.exec(w);
     if (same) { // 名前の種類（略称など）は前の引用の話なので引き継がない
@@ -133,6 +150,35 @@ export function extractCitations(input: string, names: LawNames, defaultLawId?: 
       c.raw = `同${same[1]}${raw}`;
       if (t) Object.assign(c, t);
       else c.issues.push("no_law_name");
+      push(c);
+      continue;
+    }
+    // 「同法施行令」「同施行令」「措置法施行令」「…について、施行令第22条」: 辞書の題名（「所得税法施行令」）で終わっていなければ、
+    // 前に出た（または頭に書いた略称の）法律の施行令・施行規則とする。頭に何もないときは同じ段落の法律からの推定
+    const sub = SUB.exec(w);
+    const full = sub ? names.longestSuffix(w) : null;
+    if (sub && !(full && full.name.endsWith(sub[1]))) {
+      const head = w.slice(0, -sub[1].length);
+      const same = /同法?$/.exec(head);
+      const abbr = same ? null : names.longestSuffix(head);
+      const parentIds = abbr && head.endsWith(abbr.name) ? [...new Set(abbr.hits.map((h) => h.lawId))] : [];
+      const bare = !same && !parentIds.length && !KANJI_END.test(head);
+      const parent = same ? lastAct()?.lawId : parentIds.length === 1 ? parentIds[0] : bare ? lastAct()?.lawId : undefined;
+      const target = subOf(parent, sub[1]);
+      const label = `${same ? same[0] : parentIds.length === 1 ? abbr!.name : ""}${sub[1]}`;
+      c.raw = `${label}${raw}`;
+      if (target) {
+        Object.assign(c, target);
+        c.nameKind = "abbrev";
+        if (bare) {
+          if (!named || named.lawId !== parent || (prev?.lawId !== parent && prev?.lawId !== target.lawId)
+            || /\n\s*\n/.test(text.slice(named.end, p)) || p - named.end > INFER_WINDOW) {
+            c.lawId = undefined;
+            c.lawName = undefined;
+            c.issues.push("no_law_name");
+          } else c.issues.push("inferred_law");
+        }
+      } else c.issues.push("no_law_name");
       push(c);
       continue;
     }
@@ -195,6 +241,11 @@ export function extractCitations(input: string, names: LawNames, defaultLawId?: 
         c.issues.push("unknown_law");
       } else if (defaultLawId) {
         c.lawId = defaultLawId;
+      } else if (named && prev?.lawId === named.lawId && p - named.end <= INFER_WINDOW && !/\n\s*\n/.test(text.slice(named.end, p))) {
+        // 直前の引用の法令が分かっているときだけ（分からない引用を飛び越えて、その前の法令に結び付けない）
+        c.lawId = named.lawId;
+        c.lawName = named.lawName;
+        c.issues.push("inferred_law");
       } else {
         c.issues.push("no_law_name");
       }

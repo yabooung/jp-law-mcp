@@ -14,10 +14,17 @@ import { collectArticles } from "../src/tools/search.js";
 
 const GYO = "405AC0000000088";
 const SHO = "340AC0000000033";
+const MIN = "129AC0000000089";
+const SHO_REI = "340CO0000000096";
+const SOCHI = "332AC0000000026";
+const SOCHI_REI = "332CO0000000043";
 const names = new LawNames([
   ["行政手続法", GYO, "canonical"], ["行手法", GYO, "abbrev"], ["平成5年法律第88号", GYO, "promulgation"],
   ["所得税法", SHO, "canonical"], ["昭和40年法律第33号", SHO, "promulgation"],
   ["民法", "129AC0000000089", "canonical"],
+  ["所得税法施行令", "340CO0000000096", "canonical"],
+  ["租税特別措置法", "332AC0000000026", "canonical"], ["措置法", "332AC0000000026", "alias"],
+  ["租税特別措置法施行令", "332CO0000000043", "canonical"],
   ["旧題名法", "999AC0000000001", "old_name"], ["新題名法", "999AC0000000001", "canonical"],
   ["同名法", "111AC0000000001", "canonical"], ["同名法", "222AC0000000002", "canonical"],
   ["平成10年法律第2号", "222AC0000000002", "promulgation"],
@@ -25,6 +32,16 @@ const names = new LawNames([
 ]);
 
 describe("extractCitations", () => {
+  it("reads 施行令 written without the act's full name", () => {
+    const law = (t: string) => one(t).map((c) => (c.issues.includes("inferred_law") ? `~${c.lawId}` : c.lawId ?? c.issues[0]));
+    expect(law("所得税法第9条第1項第18号、同法施行令第30条")).toEqual([SHO, SHO_REI]);
+    expect(law("租税特別措置法第33条第1項および同施行令第22条第6項")).toEqual([SOCHI, SOCHI_REI]);
+    expect(law("措置法施行令第40条の6・第40条の7")).toEqual([SOCHI_REI, SOCHI_REI]);
+    expect(law("租税特別措置法第33条を見ます。施行令第22条第11項")).toEqual([SOCHI, `~${SOCHI_REI}`]);
+    expect(law("施行令第22条")).toEqual(["no_law_name"]); // 前に法律がなければ決めない
+    expect(law("民法第5条、同法施行令第3条")).toEqual([MIN, "no_law_name"]); // 辞書に「民法施行令」はない
+  });
+
   const one = (t: string, d?: string) => extractCitations(t, names, d);
 
   it("reads law, article, paragraph and item", () => {
@@ -66,11 +83,15 @@ describe("extractCitations", () => {
   });
 
   it("carries the law over an enumeration, but not over other words or a line break", () => {
-    const law = (t: string) => one(t).map((c) => c.lawId ?? c.issues[0]);
+    // 「~」付きは推定（同じ段落で直前に名前を書いた法令とみなしたもの）
+    const law = (t: string) => one(t).map((c) => (c.issues.includes("inferred_law") ? `~${c.lawId}` : c.lawId ?? c.issues[0]));
     expect(law("所得税法第33条、第34条第1項、第6項及び第35条")).toEqual([SHO, SHO, SHO]);
     expect(law("所得税法第9条から第11条まで")).toEqual([SHO, SHO]);
-    expect(law("所得税法第33条の規定により、第5条")).toEqual([SHO, "no_law_name"]);
-    expect(law("所得税法第33条\n第34条")).toEqual([SHO, "no_law_name"]);
+    expect(law("民法第901条第1項ただし書、第900条第4号")).toEqual([MIN, MIN]);
+    expect(law("所得税法第33条の規定により、第5条")).toEqual([SHO, `~${SHO}`]);
+    expect(law("所得税法第33条\n第34条")).toEqual([SHO, `~${SHO}`]);
+    expect(law("所得税法第33条。\n\nなお、第34条")).toEqual([SHO, "no_law_name"]); // 段落が変わったら推定しない
+    expect(law("所得税法第33条、地方行政手続法第3条。第5条")).toEqual([SHO, "unknown_law", "no_law_name"]); // 分からない引用を飛び越えない
     expect(law("所得税法第33条、民法第5条、第6条")).toEqual([SHO, "129AC0000000089", "129AC0000000089"]);
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { IP_RATE_PER_MIN, RATE_PER_MIN, allow, ipPrefix, userTag } from "../src/http.js";
+import { IP_RATE_PER_MIN, RATE_PER_MIN, allow, ipPrefix, toolCalls, userTag } from "../src/http.js";
 
 describe("rate limit per client", () => {
   it("allows RATE_PER_MIN requests a minute per client, then refuses until the window passes", () => {
@@ -32,5 +32,16 @@ describe("users behind one IP", () => {
   it("logs only the front of an IP", () => {
     expect(ipPrefix("160.79.104.10")).toBe("160.79.104.0/24");
     expect(ipPrefix("2607:6bc0:1:2::5")).toBe("2607:6bc0:1::/48");
+  });
+});
+
+describe("what the rate limit counts", () => {
+  it("counts tool calls only, one by one in a batch", () => {
+    expect(toolCalls({ jsonrpc: "2.0", id: 1, method: "initialize" })).toBe(0);
+    expect(toolCalls({ jsonrpc: "2.0", method: "notifications/initialized" })).toBe(0);
+    expect(toolCalls({ jsonrpc: "2.0", id: 2, method: "tools/list" })).toBe(0);
+    expect(toolCalls({ jsonrpc: "2.0", id: 3, method: "tools/call", params: { name: "find_law" } })).toBe(1);
+    expect(toolCalls([{ method: "tools/call" }, { method: "tools/call" }, { method: "ping" }])).toBe(2);
+    expect(toolCalls(undefined)).toBe(0);
   });
 });

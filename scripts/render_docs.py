@@ -25,7 +25,7 @@ def _n(x: int) -> str:
 
 
 def _pct(r: dict, places: int = 1) -> str:
-    return f"{r['k'] / r['n'] * 100:.{places}f}%"
+    return "100%" if r["k"] == r["n"] else f"{r['k'] / r['n'] * 100:.{places}f}%"
 
 
 def _kn(r: dict) -> str:
@@ -62,6 +62,13 @@ def values(root: Path = ROOT) -> dict[str, str]:
               f"{split}.flagged_kn": _kn(b["flagged"]),
               f"{split}.C_info": f"{c['by_mark'].get('ℹ', 0) / c['citations'] * 100:.1f}%",
               f"{split}.date": r["date"], f"{split}.cases": _n(r["cases"])}
+    # AI が書いた答えでの確認（eval/gate_eval.mjs の holdout を一度だけ測った結果）
+    g = json.loads((root / "eval/results/gate_holdout.json").read_text(encoding="utf-8"))
+    marks, codes = g["by_mark"], g["by_code"]
+    checked = marks.get("✅", 0) + marks.get("❌", 0)
+    v |= {"gate.date": g["date"], "gate.citations": _n(g["citations"]), "gate.checked": _n(checked),
+          "gate.checked_pct": f"{checked / g['citations'] * 100:.1f}%", "gate.no_name": _n(codes.get("no_law_name", 0)),
+          "gate.missing": _n(marks.get("❌", 0))}
     return v
 
 
