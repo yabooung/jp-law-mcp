@@ -5,49 +5,49 @@
  "A": {
   "gold_articles": 1261,
   "found": {
-   "k": 1258,
+   "k": 1261,
    "n": 1261,
-   "rate": 0.9976
+   "rate": 1
   },
-  "missed_by_reason": {
-   "no_law_name": 3
-  },
-  "correct_citations_unique": 878,
+  "missed_by_reason": {},
+  "correct_citations_unique": 881,
   "false_alarm": {
    "k": 6,
-   "n": 878,
+   "n": 881,
    "rate": 0.0068
   },
   "false_alarm_by_code": {
    "no_item": 5,
    "item_in_table": 1
   },
-  "extra_not_in_gold": 6,
+  "extra_not_in_gold": 38,
   "extra_by_code": {
-   "ok": 5,
+   "inferred_missing": 9,
+   "ok": 23,
+   "no_article": 5,
    "old_version": 1
   }
  },
  "B": {
   "base_citations": 300,
-  "tests": 1479,
+  "tests": 1471,
   "flagged": {
-   "k": 1479,
-   "n": 1479,
+   "k": 1471,
+   "n": 1471,
    "rate": 1
   },
   "right_reason": {
-   "k": 1479,
-   "n": 1479,
+   "k": 1471,
+   "n": 1471,
    "rate": 1
   },
   "by_kind": {
    "no_article_branch": {
-    "tests": 279,
-    "flagged": 279,
-    "right": 279,
+    "tests": 271,
+    "flagged": 271,
+    "right": 271,
     "got": {
-     "no_article": 279
+     "no_article": 271
     }
    },
    "no_article_beyond": {
@@ -87,15 +87,15 @@
  "C": {
   "citations": 617,
   "by_mark": {
-   "ℹ": 84,
-   "⚠": 12,
-   "✅": 518,
+   "ℹ": 77,
+   "⚠": 10,
+   "✅": 527,
    "❌": 3
   },
   "by_code": {
-   "no_law_name": 80,
-   "unknown_law": 9,
-   "ok": 518,
+   "no_law_name": 73,
+   "unknown_law": 7,
+   "ok": 527,
    "suppl_provision": 4,
    "old_version": 3,
    "no_item": 3
