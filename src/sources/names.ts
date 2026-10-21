@@ -4,21 +4,24 @@ import { gunzipSync } from "node:zlib";
 
 import { kanjiToNumber } from "../lib/article.js";
 
-export type NameKind = "canonical" | "abbrev" | "alias" | "old_name" | "promulgation";
-export interface NameHit { lawId: string; kind: NameKind }
+/** new_name: 施行予定の改正で変わる題名（data/law_names.json.gz では 4 つ目に施行日） */
+export type NameKind = "canonical" | "abbrev" | "alias" | "old_name" | "promulgation" | "new_name";
+export interface NameHit { lawId: string; kind: NameKind; date?: string }
 
 export class LawNames {
   private readonly byName = new Map<string, NameHit[]>();
   private readonly canonical = new Map<string, string>();
+  private readonly renames = new Map<string, { title: string; date: string }>();
   readonly maxLen: number;
 
-  constructor(names: Array<[string, string, NameKind]>) {
+  constructor(names: Array<[string, string, NameKind] | [string, string, NameKind, string]>) {
     let max = 0;
-    for (const [name, lawId, kind] of names) {
+    for (const [name, lawId, kind, date] of names) {
       const list = this.byName.get(name) ?? [];
-      list.push({ lawId, kind });
+      list.push(date ? { lawId, kind, date } : { lawId, kind });
       this.byName.set(name, list);
       if (kind === "canonical") this.canonical.set(lawId, name);
+      if (kind === "new_name" && date && (this.renames.get(lawId)?.date ?? "9999") > date) this.renames.set(lawId, { title: name, date });
       if (kind !== "promulgation") max = Math.max(max, name.length);
     }
     // 題名のない法令は「昭和二十二年法律第百七十五号（災害被害者に対する…法律）」の形で入っている。括弧の中の名前でも引けるようにする
@@ -34,7 +37,7 @@ export class LawNames {
   }
 
   static load(url: URL = new URL("../../data/law_names.json.gz", import.meta.url)): LawNames {
-    const raw = JSON.parse(gunzipSync(readFileSync(url)).toString("utf-8")) as { names: Array<[string, string, NameKind]> };
+    const raw = JSON.parse(gunzipSync(readFileSync(url)).toString("utf-8")) as { names: Array<[string, string, NameKind, string]> };
     return new LawNames(raw.names);
   }
 
@@ -44,6 +47,11 @@ export class LawNames {
 
   titleOf(lawId: string): string | undefined {
     return this.canonical.get(lawId);
+  }
+
+  /** 施行予定の改正で題名が変わるなら、その題名と施行日（いちばん早いもの） */
+  renameOf(lawId: string): { title: string; date: string } | undefined {
+    return this.renames.get(lawId);
   }
 
   /** 文字列の末尾に一致する最も長い法令名 */

@@ -110,14 +110,20 @@ function nameVerdict(c: Citation, dict: LawNames, asof?: string): Verdict | null
   return null;
 }
 
-/** 法令番号の食い違い・旧題名・略称の注記を付ける */
-function withNotes(c: Citation, v: Verdict, title: string, lawNum: string, link: string): Verdict {
+/** 法令番号の食い違い・旧題名・改正後の題名・改題予定・略称の注記を付ける */
+function withNotes(c: Citation, v: Verdict, title: string, lawNum: string, link: string, dict?: LawNames): Verdict {
   const notes: string[] = [];
   if (c.issues.includes("promulgation_mismatch") && v.mark !== "❌") {
     v = { ...v, mark: "⚠", code: "promulgation_mismatch" };
     notes.push(`括弧内の法令番号「${c.promulgation}」は${title}（${lawNum}）と一致しません`);
   }
   if (c.nameKind === "old_name") notes.push(`「${c.lawName}」は旧題名です（現在は${title}）`);
+  const rename = c.lawId ? dict?.renameOf(c.lawId) : undefined;
+  if (c.nameKind === "new_name" && rename) {
+    notes.push(`「${c.lawName}」は ${rename.date} に施行される改正の後の題名です（いまの題名は${title}。条・項・号はいまの版で確かめています）`);
+  } else if (rename) {
+    notes.push(`${title}は ${rename.date} から「${rename.title}」に題名が変わります`);
+  }
   if (c.nameKind === "abbrev" || c.nameKind === "alias") notes.push(`「${c.lawName}」は${title}の略称として解釈`);
   return { ...v, text: `${v.text}${notes.length ? `\n   ${notes.join("。")}` : ""}\n   原文: ${link}` };
 }
@@ -172,7 +178,7 @@ export async function verifyText(
         : meta!.active ? { mark: "✅", code: "ok", text: `${c.raw} → ${title} ${locate(c)}${at}` }
         : { mark: "⚠", code: "repealed", text: `${c.raw} → ${title} ${locate(c)}${repealText("Repeal")}${at}` };
     }
-    jobs.set(i, { c, title, snap: withNotes(c, snap, title, meta!.lawNum, link), negative: snap.mark !== "✅" });
+    jobs.set(i, { c, title, snap: withNotes(c, snap, title, meta!.lawNum, link, dict), negative: snap.mark !== "✅" });
   });
 
   // API に回す順: スナップショットで「ない」・確かめられないもの → 「ある」もの（抜粋のため）。上限を超えた分はスナップショットの判定のまま
@@ -196,7 +202,7 @@ export async function verifyText(
         mark: repeal ? "⚠" : "✅", code: repeal ? "repealed" : "ok",
         text: `${c.raw} → ${t} ${locate(c)}${shape.caption}${repeal}「${excerptOf(c, paras)}」`,
       };
-      verdicts[i] = withNotes(c, v, t, data.law_info.law_num, egovLawUrl(c.lawId!, data.revision_info.law_revision_id));
+      verdicts[i] = withNotes(c, v, t, data.law_info.law_num, egovLawUrl(c.lawId!, data.revision_info.law_revision_id), dict);
     } catch (e) {
       if (e instanceof EgovError && (e.code === "404004" || e.code === "400021")) {
         const lastArt = asof ? undefined : structure.lastArticle(c.lawId!);

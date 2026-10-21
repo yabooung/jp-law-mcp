@@ -27,13 +27,21 @@ export class UserError extends Error {}
  * 当たればそれを使い（e-Gov を呼ばない）、当たらなければ e-Gov で探して 1 件に絞る。絞れなければ候補を示して止める。
  * 辞書は現行法令だけなので、廃止法令やスナップショット後の新法令・改題は e-Gov で探すことになる。
  */
-export async function resolveLaw(client: EgovClient, law: string, names?: LawNames): Promise<{ lawId: string; title?: string }> {
+export async function resolveLaw(client: EgovClient, law: string, names?: LawNames): Promise<{ lawId: string; title?: string; note?: string }> {
   const q = law.normalize("NFKC").trim();
-  if (LAW_ID_RE.test(q)) return { lawId: q };
-  const local = new Set((names?.lookup(q) ?? []).filter((h) => h.kind === "canonical" || h.kind === "abbrev").map((h) => h.lawId));
-  if (local.size === 1) {
-    const [lawId] = local;
-    return { lawId, title: names!.titleOf(lawId) };
+  if (LAW_ID_RE.test(q)) return { lawId: q, note: names && renameNote(names, q) };
+  const hits = names?.lookup(q) ?? [];
+  // 正式名・略称でちょうど 1 法令に決まれば、それ。決まらなければ旧題名・改正後の題名で 1 法令に決まるか見る
+  for (const kinds of [["canonical", "abbrev"], ["old_name", "new_name"]]) {
+    const ids = new Set(hits.filter((h) => kinds.includes(h.kind)).map((h) => h.lawId));
+    if (ids.size !== 1) continue;
+    const [lawId] = ids;
+    const title = names!.titleOf(lawId);
+    const kind = hits.find((h) => h.lawId === lawId && kinds.includes(h.kind))!.kind;
+    const note = kind === "old_name" ? `「${q}」は旧題名です（現在は${title}）。`
+      : kind === "new_name" ? `「${q}」は ${names!.renameOf(lawId)?.date ?? "施行予定"} に施行される改正の後の題名です（いまの題名は${title}。いまの版を返します）。`
+      : renameNote(names!, lawId);
+    return { lawId, title, note };
   }
   const res = await client.searchLaws(q, { limit: 20 });
   const laws = res.laws;
@@ -45,6 +53,12 @@ export async function resolveLaw(client: EgovClient, law: string, names?: LawNam
   if (chosen) return { lawId: chosen.law_info.law_id, title: (chosen.current_revision_info ?? chosen.revision_info).law_title };
   const list = laws.slice(0, 8).map((l) => `- ${(l.current_revision_info ?? l.revision_info).law_title}（${l.law_info.law_id}）`);
   throw new UserError(`「${q}」に当たる法令が ${res.total_count} 件あります。law に法令IDか正式名称を指定してください。\n${list.join("\n")}`);
+}
+
+/** 施行予定の改正で題名が変わる法令への注記 */
+function renameNote(names: LawNames, lawId: string): string | undefined {
+  const r = names.renameOf(lawId);
+  return r ? `${names.titleOf(lawId) ?? lawId}は ${r.date} から「${r.title}」に題名が変わります。` : undefined;
 }
 
 function versionLine(r: RevisionInfo): string {
@@ -72,9 +86,9 @@ async function fetchArticle(client: EgovClient, law: string, article: string, as
   const num = parseArticleNumber(article);
   if (!num) throw new UserError(`条番号「${article}」を読めませんでした。例: 8、第八条、36条の2`);
   checkAsof(asof);
-  const { lawId } = await resolveLaw(client, law, names);
+  const { lawId, note } = await resolveLaw(client, law, names);
   const data: LawDataResponse = await client.article(lawId, num, asof);
-  return { lawId, num, data, lines: renderArticle(data.law_full_text) };
+  return { lawId, num, data, lines: renderArticle(data.law_full_text), note };
 }
 
 export function registerLawTools(
@@ -93,9 +107,20 @@ export function registerLawTools(
     },
     async ({ title, limit }) => {
       try {
-        const res = await client.searchLaws(title.normalize("NFKC").trim(), { limit });
-        if (res.laws.length === 0) return ok(`「${title}」に当たる法令は見つかりませんでした（NOT_FOUND）。\n${FOOTER}`);
-        const lines = [`該当 ${res.total_count} 件（上位 ${res.laws.length} 件）`];
+        const q = title.normalize("NFKC").trim();
+        // 旧題名・改正後の題名は e-Gov の題名検索で見つからないことがあるので、辞書で当たればそれを先に示す
+        const dict = names?.();
+        const renamed = (dict?.lookup(q) ?? []).filter((h) => h.kind === "old_name" || h.kind === "new_name");
+        const known = renamed.map((h) => {
+          const t = dict!.titleOf(h.lawId) ?? h.lawId;
+          return h.kind === "old_name" ? `- 「${q}」は${t}（法令ID ${h.lawId}）の旧題名です`
+            : `- 「${q}」は${t}（法令ID ${h.lawId}）の ${h.date ?? "施行予定"} 施行の改正後の題名です`;
+        });
+        const res = await client.searchLaws(q, { limit });
+        if (res.laws.length === 0) {
+          return ok(known.length ? [...known, "", FOOTER].join("\n") : `「${title}」に当たる法令は見つかりませんでした（NOT_FOUND）。\n${FOOTER}`);
+        }
+        const lines = [...known, `該当 ${res.total_count} 件（上位 ${res.laws.length} 件）`];
         for (const l of res.laws) {
           const r = l.current_revision_info ?? l.revision_info;
           const status = statusLabel(r.current_revision_status);
@@ -126,7 +151,7 @@ export function registerLawTools(
     },
     async ({ law, article, asof }) => {
       try {
-        const [{ lawId, num, data, lines }, revs] = await Promise.all([
+        const [{ lawId, num, data, lines, note }, revs] = await Promise.all([
           fetchArticle(client, law, article, asof, dict()),
           resolveLaw(client, law, dict()).then(({ lawId }) => client.revisions(lawId)).catch(() => null),
         ]);
@@ -135,6 +160,7 @@ export function registerLawTools(
           `${r.law_title} ${articleLabel(num)}`,
           `法令ID ${lawId}｜${data.law_info.law_num}`,
           `版: ${versionLine(r)}${asof ? `（${asof} 時点で施行されていた版）` : ""}`,
+          ...(note ? [`題名: ${note}`] : []),
           "",
           ...lines,
           "",
@@ -172,10 +198,10 @@ export function registerLawTools(
     },
     async ({ law, limit }) => {
       try {
-        const { lawId } = await resolveLaw(client, law, dict());
+        const { lawId, note } = await resolveLaw(client, law, dict());
         const res = await client.revisions(lawId);
         const title = res.revisions[0]?.law_title ?? lawId;
-        const lines = [`${title}（${res.law_info.law_num}・法令ID ${lawId}）の改正履歴 ${res.revisions.length} 件`];
+        const lines = [`${title}（${res.law_info.law_num}・法令ID ${lawId}）の改正履歴 ${res.revisions.length} 件`, ...(note ? [`題名: ${note}`] : [])];
         for (const r of res.revisions.slice(0, limit)) lines.push(`- ${versionLine(r)}｜原文 ${egovLawUrl(lawId, r.law_revision_id)}`);
         if (res.revisions.length > limit) lines.push(`…ほか ${res.revisions.length - limit} 件`);
         lines.push("", FOOTER);
@@ -205,6 +231,7 @@ export function registerLawTools(
         const rb = b.data.revision_info;
         const head = [
           `${rb.law_title} ${articleLabel(a.num)} 新旧比較`,
+          ...(b.note ? [`題名: ${b.note}`] : []),
           `旧: ${from} 時点 — ${versionLine(ra)}`,
           `新: ${to ?? "現行"} — ${versionLine(rb)}`,
           "",
