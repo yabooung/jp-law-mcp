@@ -4,7 +4,7 @@
 
 日本の行政実務者が Claude などの AI から使える、法令と国会会議録の MCP サーバーです。
 条文の取得（時点指定）、改正履歴・新旧比較、本文検索、**AI が書いた文書の法令引用の実在確認**、**引用・委任の逆引き**、国会会議録の発言検索ができます。
-韓国の [korean-law-mcp](https://github.com/chrisryugj/korean-law-mcp) にならい、データは [JLaw-CiteGraph（jlawcite）](https://github.com/yabooung/jp-law-citation-graph) を使います。
+引用グラフ・法令名・条文の形のデータは [JLaw-CiteGraph（jlawcite）](https://github.com/yabooung/jp-law-citation-graph) から作っています。
 
 ## 使い方
 
