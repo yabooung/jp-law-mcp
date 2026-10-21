@@ -1,6 +1,6 @@
 {
  "split": "dev",
- "date": "2026-10-20",
+ "date": "2026-10-21",
  "cases": 591,
  "A": {
   "gold_articles": 1263,
@@ -99,5 +99,5 @@
    "suppl_provision": 4
   }
  },
- "source": "e-Gov snapshot 2026-09-27 (data/structure.json.gz, no API calls)"
+ "source": "e-Gov snapshot 2026-10-19 (data/structure.json.gz, no API calls)"
 }

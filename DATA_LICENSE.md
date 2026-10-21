@@ -9,7 +9,7 @@
 出典を示せば、商用を含め自由に共有・改変できます。
 
 ## 出典表示
-> e-Gov 法令検索（デジタル庁, https://laws.e-gov.go.jp/）の法令データ（スナップショット 2026-09-27）を
+> e-Gov 法令検索（デジタル庁, https://laws.e-gov.go.jp/）の法令データ（スナップショット 2026-10-19）を
 > JLaw-CiteGraph（https://github.com/yabooung/jp-law-citation-graph）で加工して作成
 
 法令そのものは著作権法第13条により権利の目的となりません。`src/`・`api/`・`scripts/`・`eval/*.mjs`・`test/` のコードは

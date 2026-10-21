@@ -12,7 +12,7 @@
     l     : [引用元 arts 番号, 引用先 laws 番号, 0/1, 回数]
 
 使い方:
-    python scripts/export_graph.py --db <jp_search.sqlite> --jlawcite 2.5.0 --out data/graph.json.gz
+    python scripts/export_graph.py --db <jp_search.sqlite> --jlawcite 2.5.0 --snapshot <日付> --out data/graph.json.gz
 """
 from __future__ import annotations
 
@@ -43,7 +43,7 @@ def main() -> int:
     ap.add_argument("--db", type=Path, required=True)
     ap.add_argument("--out", type=Path, default=Path("data/graph.json.gz"))
     ap.add_argument("--jlawcite", required=True, help="検索DBを作った jlawcite の版（例 2.5.0）")
-    ap.add_argument("--snapshot", default="2026-09-27", help="e-Gov スナップショット日（jlawcite release_stats.json の egov_snapshot）")
+    ap.add_argument("--snapshot", required=True, help="e-Gov スナップショット日（jlawcite release_stats.json の egov_snapshot）")
     a = ap.parse_args()
 
     con = sqlite3.connect(f"file:{a.db.as_posix()}?mode=ro", uri=True)

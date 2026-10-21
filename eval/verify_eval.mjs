@@ -15,10 +15,10 @@
  * 事例は id のハッシュで dev / test に半分ずつ分ける。直すのは dev を見てだけ。test は --unseal を付けたときだけ、最後に一度。
  *
  * e-Gov API は呼ばない（maxApiCalls: 0。CONTRIBUTING.md「外部 API の使い方」）。ツールは条・項・号の有無を
- * 同梱のスナップショット data/structure.json.gz で判定するので、評価はその判定そのものを測る。正解も同じ
- * スナップショット（e-Gov 2026-09-27）から作られているので時点がそろう。現行版での確かめ直しと抜粋は含まない。
+ * 同梱のスナップショット data/structure.json.gz で判定するので、評価はその判定そのものを測る。現行版での確かめ直しと
+ * 抜粋は含まない。正解は e-Gov 2026-09-27 で作られ、同梱は 2026-10-19（両方で dev・test の数値は同じ、2026-10-21）。
  *
- *   python scripts/export_structure.py --nodes <jlawcite のパイプライン出力 jp_nodes.jsonl> --snapshot 2026-09-27
+ *   python scripts/export_structure.py --db <jlawcite の検索DB jp_search.sqlite> --snapshot 2026-10-19
  *   node eval/verify_eval.mjs --gold <jlawcite リポジトリの eval/v2/nta_gold.jsonl> --split dev
  */
 import { createHash } from "node:crypto";
