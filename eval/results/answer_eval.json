@@ -1,0 +1,82 @@
+{
+ "date": "2026-10-21",
+ "model": "sonnet",
+ "cases": 50,
+ "snapshot": "2026-10-20",
+ "conds": {
+  "mcp": {
+   "answered": 50,
+   "gold_recall": {
+    "k": 72,
+    "n": 100,
+    "rate": 0.72
+   },
+   "any_gold": {
+    "k": 45,
+    "n": 50,
+    "rate": 0.9
+   },
+   "citations": 284,
+   "citations_with_law": 230,
+   "nonexistent": {
+    "k": 13,
+    "n": 284,
+    "rate": 0.0458
+   },
+   "not_in_gold_existing": 110,
+   "used_tools": {
+    "k": 36,
+    "n": 50,
+    "rate": 0.72
+   },
+   "tool_calls": 87,
+   "conclusion": {
+    "不一致": 15,
+    "一致": 24,
+    "一部一致": 11
+   },
+   "conclusion_agree": {
+    "k": 24,
+    "n": 50,
+    "rate": 0.48
+   }
+  },
+  "none": {
+   "answered": 50,
+   "gold_recall": {
+    "k": 66,
+    "n": 100,
+    "rate": 0.66
+   },
+   "any_gold": {
+    "k": 42,
+    "n": 50,
+    "rate": 0.84
+   },
+   "citations": 251,
+   "citations_with_law": 211,
+   "nonexistent": {
+    "k": 18,
+    "n": 251,
+    "rate": 0.0717
+   },
+   "not_in_gold_existing": 121,
+   "used_tools": {
+    "k": 0,
+    "n": 50,
+    "rate": 0
+   },
+   "tool_calls": 0,
+   "conclusion": {
+    "一致": 25,
+    "一部一致": 9,
+    "不一致": 16
+   },
+   "conclusion_agree": {
+    "k": 25,
+    "n": 50,
+    "rate": 0.5
+   }
+  }
+ }
+}
