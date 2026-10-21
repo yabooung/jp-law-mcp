@@ -77,10 +77,13 @@ function judge(c: Citation, title: string, s: Shape): Verdict | null {
   return null;
 }
 
-function excerptOf(c: Citation, paras: Array<Record<string, unknown>>): string {
+/** 引用した項・号の本文の抜粋。detail のときは長く（主張と条文を突き合わせるため） */
+export const EXCERPT = 90;
+export const EXCERPT_DETAIL = 600;
+function excerptOf(c: Citation, paras: Array<Record<string, unknown>>, max = EXCERPT): string {
   const para = paras[(c.paragraph ?? 1) - 1];
   const body = c.item ? sentencesOf(asList(para?.Item)[c.item - 1]?.ItemSentence) : sentencesOf(para?.ParagraphSentence);
-  return body.length > 90 ? `${body.slice(0, 90)}…` : body;
+  return body.length > max ? `${body.slice(0, max)}…` : body;
 }
 
 function repealText(status: string | null | undefined): string {
@@ -145,8 +148,8 @@ interface Job {
  */
 export async function verifyText(
   text: string,
-  { client, names: dict, structure, asof, defaultLaw: default_law, maxApiCalls = MAX_API_CALLS }:
-    { client: EgovClient; names: LawNames; structure: LawStructure; asof?: string; defaultLaw?: string; maxApiCalls?: number },
+  { client, names: dict, structure, asof, defaultLaw: default_law, maxApiCalls = MAX_API_CALLS, excerpt = EXCERPT }:
+    { client: EgovClient; names: LawNames; structure: LawStructure; asof?: string; defaultLaw?: string; maxApiCalls?: number; excerpt?: number },
 ): Promise<VerifyResult> {
   let defaultId: string | undefined;
   if (default_law) {
@@ -225,7 +228,7 @@ export async function verifyText(
       const repeal = repealText(data.revision_info.repeal_status);
       const v: Verdict = bad ?? {
         mark: repeal ? "⚠" : "✅", code: repeal ? "repealed" : "ok",
-        text: `${c.raw} → ${t} ${locate(c)}${shape.caption}${repeal}「${excerptOf(c, paras)}」`,
+        text: `${c.raw} → ${t} ${locate(c)}${shape.caption}${repeal}「${excerptOf(c, paras, excerpt)}」`,
       };
       verdicts[i] = withNotes(c, v, t, data.law_info.law_num, egovLawUrl(c.lawId!, data.revision_info.law_revision_id), dict);
     } catch (e) {
@@ -269,14 +272,15 @@ export function registerVerifyTools(server: McpServer, client: EgovClient, names
         text: z.string().min(1).max(20000).describe("確認する文章"),
         asof: DATE.optional().describe(`この日に施行されていた版で確認（${ASOF_MIN} 以降）。省略で現行`),
         default_law: z.string().max(120).optional().describe("法令名のない「第N条」をどの法令として扱うか（法令名か法令ID）"),
+        detail: z.boolean().default(false).describe(`引用した項・号の本文を長く（${EXCERPT_DETAIL} 字まで）返す。答えの内容が条文と合っているか突き合わせるとき`),
       },
     },
-    async ({ text, asof, default_law }) => {
+    async ({ text, asof, default_law, detail }) => {
       if (asof && asof < ASOF_MIN) {
         return { isError: true, content: [{ type: "text" as const, text: `時点指定は ${ASOF_MIN} 以降のみです。` }] };
       }
       const st = structure();
-      const res = await verifyText(text, { client, names: names(), structure: st, asof, defaultLaw: default_law });
+      const res = await verifyText(text, { client, names: names(), structure: st, asof, defaultLaw: default_law, excerpt: detail ? EXCERPT_DETAIL : EXCERPT });
       // 通達・判例・条例・告示は確かめない。黙って飛ばさず、確かめていないことを示す
       const named = new Set(res.checked.map((x) => x.citation.lawName).filter(Boolean));
       const others = otherCitations(text.normalize("NFKC")).filter((o) => !named.has(o.raw));

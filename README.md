@@ -59,7 +59,7 @@ AI が `compare_article`・`find_citing_provisions`・`search_diet_records` を�
 | `law_history` | 改正履歴（施行日・改正法令・現行/過去/未施行） | 同上 |
 | `compare_article` | 同じ条の二つの時点の新旧比較 | 同上 |
 | `search_law_text` | 本文の全文検索（空白区切り AND）。上位 3 法令はその文が第何条かも示す | e-Gov 法令API v2 `/keyword`・本文 |
-| `verify_citations` | 文章中の法令引用を取り出し、法令・条・項・号の実在を確認。存在しない条・項、法令番号と名称の食い違い、架空の法令名、廃止法令を知らせ、照合用の抜粋を付ける（[評価](#引用確認の評価)） | `data/structure.json.gz`・`data/law_names.json.gz` + e-Gov（1 回最大 10 件） |
+| `verify_citations` | 文章中の法令引用を取り出し、法令・条・項・号の実在を確認。存在しない条・項、法令番号と名称の食い違い、架空の法令名、廃止法令を知らせ、照合用の抜粋を付ける（[評価](#引用確認の評価)）。`detail=true` で引用した項・号の本文を長く返す（答えの内容と突き合わせるため） | `data/structure.json.gz`・`data/law_names.json.gz` + e-Gov（1 回最大 10 件） |
 | `find_citing_provisions` | **逆引き**: この条（または法令全体）を引用・委任元として参照している条文を法令ごとに。`depth=2` で間接的な影響範囲 | `data/graph.json.gz`（jlawcite から生成） |
 | `find_cited_provisions` | この条が引用している条・委任先の政令省令 | 同上 |
 | `search_diet_records` | 国会会議録の発言検索（立法趣旨・政府答弁の確認） | [国会会議録検索システム 検索用API](https://kokkai.ndl.go.jp/api.html) |
@@ -97,6 +97,7 @@ AI が `compare_article`・`find_citing_provisions`・`search_diet_records` を�
 
 - `scripts/export_graph.py` が jlawcite <!--v:jlawcite-->2.5.0<!--/v--> の検索DBから作る。e-Gov スナップショット <!--v:snapshot-->2026-10-20<!--/v-->、本則の条から出る引用・委任 <!--v:graph.article_edges-->527,278<!--/v--> 組（条→条）と <!--v:graph.law_edges-->26,238<!--/v--> 組（条→法令）、<!--v:graph.articles-->198,330<!--/v--> 条、gzip <!--v:graph.mb-->2.6MB<!--/v-->
 - 附則から出る参照と同じ条の中の参照は入れていない
+- `get_article` は現行の法律の条を返すとき、その条を引用している施行令・施行規則の条をこのグラフから添える（委任先の条を記憶で書かずに選べるように）。質疑応答事例の正解で、施行令・施行規則の条とその親の法律の条がともに正解にある <!--v:sub.n-->543<!--/v--> 件のうち、親の条を読んだときの一覧に正解の条が出るのは <!--v:sub.listed-->455<!--/v--> 件（<!--v:sub.rate-->83.8%<!--/v-->）（`eval/subordinate_eval.mjs`）
 - 「行政手続法第二章（申請に対する処分）（第八条（理由の提示）を除く。）」のような、他の法令の章・節・款のあとの括弧の中の条は、その法令の条として扱う（jlawcite 2.5.0 の抽出修正で直ったもの。それまでは引用元の法令自身の第八条に結び付いていた。2026-09-27 スナップショットで 962 組を追加・387 組を削除、無作為 20 件を本文と照合して全件正しい）
 - 読み込みは最初に使ったときだけ（約 0.2 秒、ヒープ約 51MB）
 

@@ -64,6 +64,8 @@ jobs:
       - name: 引用確認の評価（test）
         # 設定は変えずに数値だけ測り直す（2026-10-21 決定）。test の結果は判定にも修正にも使わない
         run: node eval/verify_eval.mjs --gold work/nta_gold.jsonl --split test --unseal
+      - name: 施行令・施行規則の一覧の評価
+        run: node eval/subordinate_eval.mjs --gold work/nta_gold.jsonl
       - name: 文書の数値
         run: |
           python scripts/render_docs.py

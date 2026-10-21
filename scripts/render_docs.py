@@ -64,6 +64,9 @@ def values(root: Path = ROOT) -> dict[str, str]:
               f"{split}.flagged_kn": _kn(b["flagged"]),
               f"{split}.C_info": f"{c['by_mark'].get('ℹ', 0) / c['citations'] * 100:.1f}%",
               f"{split}.date": r["date"], f"{split}.cases": _n(r["cases"])}
+    # get_article が添える施行令・施行規則の一覧（eval/subordinate_eval.mjs）
+    sub = json.loads((root / "eval/results/subordinate.json").read_text(encoding="utf-8"))
+    v |= {"sub.n": _n(sub["sub_articles"]), "sub.listed": _n(sub["listed"]), "sub.rate": f"{sub['rate'] * 100:.1f}%"}
     # AI が書いた答えでの確認（eval/gate_eval.mjs の holdout を一度だけ測った結果）
     g = json.loads((root / "eval/results/gate_holdout.json").read_text(encoding="utf-8"))
     marks, codes = g["by_mark"], g["by_code"]

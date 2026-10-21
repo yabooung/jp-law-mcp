@@ -214,6 +214,14 @@ describe("verify_citations", () => {
     expect(r.text).toContain("「行政庁は、申請により求められた許認可等を拒否する処分");
   });
 
+  it("returns a longer excerpt with detail=true so the claim can be compared with the text", async () => {
+    const call = await connect();
+    const short = await call("verify_citations", { text: "行政手続法第八条第一項" });
+    const long = await call("verify_citations", { text: "行政手続法第八条第一項", detail: true });
+    expect(short.text).not.toContain("これを示せば足りる");
+    expect(long.text).toContain("これを示せば足りる");
+  });
+
   it("asks e-Gov at most 10 times per call, missing ones first, and judges the rest by the snapshot", async () => {
     const log: URL[] = [];
     const call = await connect(log);
