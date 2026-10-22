@@ -1,6 +1,6 @@
 {
  "split": "test",
- "date": "2026-10-21",
+ "date": "2026-10-22",
  "cases": 595,
  "A": {
   "gold_articles": 1261,
@@ -22,8 +22,8 @@
   },
   "extra_not_in_gold": 38,
   "extra_by_code": {
-   "inferred_missing": 9,
-   "ok": 23,
+   "inferred_missing": 8,
+   "ok": 24,
    "no_article": 5,
    "old_version": 1
   }
@@ -88,14 +88,14 @@
   "citations": 617,
   "by_mark": {
    "ℹ": 77,
-   "⚠": 10,
-   "✅": 527,
+   "⚠": 9,
+   "✅": 528,
    "❌": 3
   },
   "by_code": {
    "no_law_name": 73,
-   "unknown_law": 7,
-   "ok": 527,
+   "unknown_law": 6,
+   "ok": 528,
    "suppl_provision": 4,
    "old_version": 3,
    "no_item": 3
