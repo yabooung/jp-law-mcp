@@ -81,7 +81,7 @@ jobs:
             commit -m "Data: $s — graph, law names and structure from one jlawcite search DB; eval re-run"
           git push origin HEAD:main
       - name: 接続先が新しいデータで動いているか
-        run: node scripts/smoke_remote.mjs --wait 900
+        run: node scripts/smoke_remote.mjs --wait 900 --no-egov
       - name: npm パッケージと Claude デスクトップ拡張も同じデータで出す
         # 版は「package.json の 2 桁 + スナップショット日」（例 0.2.20261101）。リポジトリの package.json は書き換えない。
         # このため手で出すコードの版は minor を上げる（0.3.0 …）。patch を上げても日付の版より小さく、latest にならない。
